@@ -1,4 +1,4 @@
-* Addie
+# Addie
 
 *Addie* (named for an [early 20th century Australian accountant][addie], whose name also happens to contain a mathematical operation) handles the accounting for Planet Nine.
 Any transaction which involves human money should probably route through Addie.
@@ -41,6 +41,34 @@ So you create a user, and then store payment tokens, and use them for purchases.
 
 > ```javascript
 >  curl -X PUT -H "Content-Type: application/json" -d '{"pubKey": "key", "timestamp": "now", "signature": "sig"}' https://<placeholderURL>/user/create
+> ```
+
+</details>
+
+<details>
+ <summary><code>PUT</code> <code><b>/user/:uuid/processor/:processor</b></code> <code>Creates an account token for a processor</code></summary>
+
+##### Parameters
+
+> | name         |  required     | data type               | description                                                           |
+> |--------------|-----------|-------------------------|-----------------------------------------------------------------------|
+> | name         |  true     | string                  | the user's name  |
+> | email        |  true     | string                  | the user's email  |
+> | timestamp    |  true     | string                  | in a production system timestamps narrow window for replay attacks  |
+> | signature    |  true     | string (signature)      | the signature from sessionless for the message  |
+
+
+##### Responses
+
+> | http code     | content-type                      | response                                                            |
+> |---------------|-----------------------------------|---------------------------------------------------------------------|
+> | `200`         | `application/json`                | `USER`   |
+> | `400`         | `application/json`                | `{"code":"400","message":"Bad Request"}`                            |
+
+##### Example cURL
+
+> ```javascript
+>  curl -X PUT -H "Content-Type: application/json" -d '{"name": "name", "email": "email@email.com", "timestamp": "now", "signature": "sig"}' https://<placeholderURL>/user/<uuid>/processor/<processor>
 > ```
 
 </details>
