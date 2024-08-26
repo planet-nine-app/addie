@@ -1,7 +1,43 @@
-
+import user from '../user/user.js';
+import db from '../persistence/db.js';
 
 const processors = {
-  getStripePaymentIntent: (foundUser, amount, currency, payees) => {
+  putStripeAccount: async (foundUser, name, email, ip) => {
+    const account = await stripeSDK.accounts.create({
+      country: 'US',
+      email: email,
+      business_type: 'individual',
+      tos_acceptance: {
+        date: Math.floor((new Date().getTime()) / 1000),
+        ip: ip,
+        service_agreement: 'full'
+      },
+      capabilities: {
+        transfers: {
+          requested: true
+        }
+      },
+      controller: {
+	fees: {
+	  payer: 'application',
+	},
+	losses: {
+	  payments: 'application',
+	},
+        requirement_collection: 'application',
+	stripe_dashboard: {
+	  type: 'none',
+	},
+      },
+    });
+
+    foundUser.stripeAccountId = account.id;
+    await user.saveUser(foundUser);
+
+    return foundUser;
+  },
+
+  getStripePaymentIntent: async (foundUser, amount, currency, payees) => {
     const customerId = foundUser.stripeAccountId || (await stripeSDK.customers.create()).id;
     if(foundUser.stripeAccountId !== customerId) {
       foundUser.stripeAccountId = customerId;
@@ -58,3 +94,5 @@ console.log('sending');
     return response;
   }
 };
+
+export default processors;

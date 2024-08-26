@@ -62,7 +62,41 @@ app.get('/user/:uuid', async (req, res) => {
   }
 });
 
-app.post('/user/:uuid/processor/:processor', async (req, res) => {
+app.put('/user/:uuid/processor/:processor', async (req, res) => {
+  try {
+    const uuid = req.params.uuid;
+    const processor = req.params.processor;
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const name = body.name;
+    const email = body.email;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    const foundUser = await user.getUser(uuid);
+
+    const message = timestamp + uuid
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status = 403;
+      return res.send({error: 'Auth error'});
+    }
+
+    let updatedUser = foundUser;
+
+    switch(processor) {
+      case 'stripe': updatedUser = await processors.putStripeAccount(foundUser, name, email, ip);
+        break;
+      default: throw new Error('processor not found');
+    }
+
+    res.send(updatedUser);
+  } catch(err) {
+    res.status = 404;
+    res.send({error: err});
+  }
+});
+
+app.post('/user/:uuid/processor/:processor/intent', async (req, res) => {
   try {
 console.log('trying to get payment intent');
     const uuid = req.params.uuid;
@@ -76,10 +110,8 @@ console.log('trying to get payment intent');
 
     const foundUser = await user.getUser(uuid);
 
-    const message = uuid + timestamp + amount + currency;
-    console.log(message);
-    console.log(foundUser.pubKey);
-    console.log(signature);
+    const message = timestamp + uuid + amount + currency;
+
     if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
       res.status = 403;
       return res.send({error: 'Auth error'});
@@ -89,12 +121,11 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case: 'stripe': paymentTokenResponse = await processors.getStripePaymentIntent(foundUser, amount, currency, payees);
+      case 'stripe': paymentTokenResponse = await processors.getStripePaymentIntent(foundUser, amount, currency, payees);
+      default: throw new Error('processor not found');
     }
 
     res.send(response);
-
-    };
   } catch(err) {
 console.log(err);
     res.status = 404;
