@@ -29,13 +29,15 @@ app.put('/user/create', async (req, res) => {
     const signature = req.body.signature;
 
     if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+console.log('auth error');
       res.status(403);
       return res.send({error: 'auth error'});
     }
 
-    const foundUser = await user.putUser(req.body.user);
+    const foundUser = await user.putUser({ pubKey });
     res.send(foundUser);
   } catch(err) {
+console.warn(err);
     res.status(404);
     res.send({error: 'not found'});
   }
@@ -48,7 +50,7 @@ app.get('/user/:uuid', async (req, res) => {
     const signature = req.query.signature;
     const message = timestamp + uuid;
 
-    const foundUser = await user.getUser(req.params.uuid);
+    const foundUser = await user.getUserByUUID(req.params.uuid);
 
     if(!signature || !sessionless.verifySignature(signature, message, foundUser.pubKey)) {
       res.status(403);
@@ -72,7 +74,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     const email = body.email;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    const foundUser = await user.getUser(uuid);
+    const foundUser = await user.getUserByUUID(uuid);
 
     const message = timestamp + uuid
 
@@ -91,6 +93,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
 
     res.send(updatedUser);
   } catch(err) {
+console.warn(err);
     res.status = 404;
     res.send({error: err});
   }
@@ -108,7 +111,7 @@ console.log('trying to get payment intent');
     const payees = body.payees;
     const signature = body.signature;
 
-    const foundUser = await user.getUser(uuid);
+    const foundUser = await user.getUserByUUID(uuid);
 
     const message = timestamp + uuid + amount + currency;
 
@@ -133,14 +136,6 @@ console.log(err);
   }
 });
 
-
-
-
-
-
-
-
-
 app.delete('/user/:uuid', async (req, res) => {
   try {
     const uuid = req.params.uuid;
@@ -148,7 +143,7 @@ app.delete('/user/:uuid', async (req, res) => {
     const signature = req.body.signature;
     const message = timestamp + uuid;
 
-    const foundUser = await user.getUser(req.params.uuid);
+    const foundUser = await user.getUserByUUID(req.params.uuid);
 
     if(!signature || !sessionless.verifySignature(signature, message, foundUser.pubKey)) {
       res.status(403);
@@ -163,3 +158,6 @@ app.delete('/user/:uuid', async (req, res) => {
     res.send({error: 'not found'});
   }
 });
+
+app.listen(3005);
+console.log('Let\'s add it up');

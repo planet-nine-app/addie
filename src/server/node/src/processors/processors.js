@@ -1,5 +1,4 @@
 import user from '../user/user.js';
-import db from '../persistence/db.js';
 
 const processors = {
   putStripeAccount: async (foundUser, name, email, ip) => {
