@@ -53,7 +53,7 @@ it('should put an account to a processor', async () => {
   const payload = {
     timestamp: new Date().getTime() + '',
     name: "Foo",
-    email: "zach" + (Math.floor(Math.random() * 100000)) + "@planetnine.app"
+    email: "zach+" + (Math.floor(Math.random() * 100000)) + "@planetnine.app"
   };
 
   const message = payload.timestamp + savedUser.uuid;
@@ -62,8 +62,9 @@ it('should put an account to a processor', async () => {
 
   const res = await put(`${baseURL}user/${savedUser.uuid}/processor/stripe`, payload);
   savedUser = res.body;
-  savedUser.stripeAccountId.should.not.be.null();
-});
+console.log('stripe account id', savedUser.stripeAccountId);
+  savedUser.stripeAccountId.should.not.equal(null);
+}).timeout(60000);
 
 it('should get user with account id', async () => {
   const timestamp = new Date().getTime() + '';
@@ -72,7 +73,7 @@ it('should get user with account id', async () => {
 
   const res = await get(`${baseURL}user/${savedUser.uuid}?timestamp=${timestamp}&signature=${signature}`);
   savedUser = res.body;
-  savedUser.stripeAccountId.should.not.be.null();
+  savedUser.stripeAccountId.should.not.equal(null);
 });
 
 it('should get a payment intent', async () => {
@@ -87,8 +88,8 @@ it('should get a payment intent', async () => {
 
   payload.signature = await sessionless.sign(message);
 
-  const res = post(`${baseURL}user/${savedUser.uuid}/processor/stripe/intent`, payload);
-  res.body.paymentIntent.should.not.be.null();
+  const res = await post(`${baseURL}user/${savedUser.uuid}/processor/stripe/intent`, payload);
+  res.body.paymentIntent.should.not.equal(null);
 });
 
 it('should delete a user', async () => {
@@ -99,7 +100,7 @@ it('should delete a user', async () => {
   const payload = {timestamp, uuid, signature};
 
 
-  const res = await _delete(`${baseURL}user/delete`, payload);
+  const res = await _delete(`${baseURL}user/${uuid}`, payload);
 console.log(res.body);
   res.status.should.equal(200);
 });

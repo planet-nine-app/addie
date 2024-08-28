@@ -72,6 +72,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     const timestamp = body.timestamp;
     const name = body.name;
     const email = body.email;
+    const signature = body.signature;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     const foundUser = await user.getUserByUUID(uuid);
@@ -125,10 +126,13 @@ console.log('past auth');
 
     switch(processor) {
       case 'stripe': paymentTokenResponse = await processors.getStripePaymentIntent(foundUser, amount, currency, payees);
+        break;
       default: throw new Error('processor not found');
     }
 
-    res.send(response);
+console.log('paymentTokenResponse', paymentTokenResponse);
+
+    res.send(paymentTokenResponse);
   } catch(err) {
 console.log(err);
     res.status = 404;
@@ -143,7 +147,7 @@ app.delete('/user/:uuid', async (req, res) => {
     const signature = req.body.signature;
     const message = timestamp + uuid;
 
-    const foundUser = await user.getUserByUUID(req.params.uuid);
+    const foundUser = await user.getUserByUUID(uuid);
 
     if(!signature || !sessionless.verifySignature(signature, message, foundUser.pubKey)) {
       res.status(403);
@@ -154,6 +158,7 @@ app.delete('/user/:uuid', async (req, res) => {
 
     res.send({success: result});
   } catch(err) {
+console.warn(err);
     res.status(404);
     res.send({error: 'not found'});
   }

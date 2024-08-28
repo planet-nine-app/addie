@@ -1,4 +1,9 @@
 import user from '../user/user.js';
+import sessionless from 'sessionless-node';
+import { stripeKey, stripePublishingKey } from '../../config/default.js';
+import stripe from 'stripe';
+
+const stripeSDK = stripe(stripeKey);
 
 const processors = {
   putStripeAccount: async (foundUser, name, email, ip) => {
@@ -37,9 +42,9 @@ const processors = {
   },
 
   getStripePaymentIntent: async (foundUser, amount, currency, payees) => {
-    const customerId = foundUser.stripeAccountId || (await stripeSDK.customers.create()).id;
-    if(foundUser.stripeAccountId !== customerId) {
-      foundUser.stripeAccountId = customerId;
+    const customerId = foundUser.stripeCustomerId || (await stripeSDK.customers.create()).id;
+    if(foundUser.stripeCustomerId !== customerId) {
+      foundUser.stripeCustomerId = customerId;
       await user.saveUser(foundUser);
     }
 
@@ -62,7 +67,7 @@ const processors = {
       transfer_group: groupName
     });
 
-    let accountsAndAmounts;
+    let accountsAndAmounts = [];
     for(var i = 0; i < payees.count; i++) {
       const payee = payees[i];
       const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
