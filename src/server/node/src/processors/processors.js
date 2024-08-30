@@ -1,7 +1,30 @@
 import user from '../user/user.js';
 import sessionless from 'sessionless-node';
-import { stripeKey, stripePublishingKey } from '../../config/default.js';
+import { default as processorKeys } from '../../config/default.js';
+//import { stripeKey, stripePublishingKey } from '../../config/default.js';
 import stripe from 'stripe';
+const stripeKey = processorKeys.stripeKey;
+const stripePublishingKey = processorKeys.stripePublishingKey;
+
+// need to think through this case a bit more
+if(!stripeKey) {
+  const processors = {
+    putStripeAccount: async (foundUser, name, email, ip) => {
+      foundUser.stripeAccountId = 'ff33ee';
+      return foundUser;
+    },
+    getStripePaymentIntent = async (foundUser, amount, currency, payees) => {
+      const response = {
+	paymentIntent: 'foo',
+	ephemeralKey: 'bar',
+	customer: 'baz,
+	publishableKey: stripePublishingKey
+      };
+    
+      return response;
+    }
+  };
+}
 
 const stripeSDK = stripe(stripeKey);
 
