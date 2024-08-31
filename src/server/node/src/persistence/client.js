@@ -33,7 +33,11 @@ const set = async (key, value) => {
 const get = async (key) => {
   const filePath = await filePathForKey(key);
 
-  return await fs.readFile(filePath, 'utf8');
+  try {
+    return await fs.readFile(filePath, 'utf8');
+  } catch(err) {
+    return null;
+  }
 };
 
 const del = async (key) => {
