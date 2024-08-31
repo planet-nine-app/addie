@@ -14,7 +14,6 @@
     "cors": "^2.8.5",
     "dayjs": "^1.11.13",
     "express": "^4.19.2",
-    "redis": "^4.7.0",
     "sessionless-node": "^0.10.1",
     "stripe": "^16.8.0"
   }
