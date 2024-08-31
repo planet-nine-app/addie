@@ -13,7 +13,7 @@ if(!stripeKey) {
       foundUser.stripeAccountId = 'ff33ee';
       return foundUser;
     },
-    getStripePaymentIntent = async (foundUser, amount, currency, payees) => {
+    getStripePaymentIntent: async (foundUser, amount, currency, payees) => {
       const response = {
 	paymentIntent: 'foo',
 	ephemeralKey: 'bar',
