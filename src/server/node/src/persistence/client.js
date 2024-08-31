@@ -1,0 +1,61 @@
+import fs from 'fs';
+import path from 'path';
+import { default as config } from '../../config/default.js';
+
+const keyDepth = config.keyDepth || 2;
+const delimiter = config.delimiter || '_';
+const basePath = config.basePath || 'data';
+
+const filePathForKey = async (key) => {
+  let mutatingKey = key;
+  const filePathParts = [];
+  for(let i = 0; i < keyDepth; i++) {
+    filePathParts.push(mutatingKey.slice(-3));
+    mutatingKey = mutatingKey.slice(0, -3);
+  }
+  filePathParts.push(mutatingKey);
+  filePathParts.push(basePath);
+
+  const filePath = filePathParts.reverse().join('/');
+
+  return filePath;
+};
+
+const set = async (key, value) => {
+  const filePath = await filePathForKey(key);
+  
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, value);
+  
+  return true;
+}
+
+const get = async (key) => {
+  const filePath = await filePathForKey(key);
+
+  return await fs.readFile(filePath, 'utf8');
+};
+
+const del = async (key) => {
+  const filePath = await filePathForKey(key);
+
+  await fs.unlink(filePath);
+
+  return true;
+};
+
+const createClient = () => {
+  return {
+    on: () => createClient,
+  };
+};
+
+createClient.connect = () => {
+  return {
+    set,
+    get,
+    del
+  };
+};
+
+export { createClient };

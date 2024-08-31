@@ -1,9 +1,9 @@
 import config from '../../config/local.js';
-import { createClient } from 'redis';
+import { createClient } from './client.js';
 import sessionless from 'sessionless-node';
   
 const client = await createClient()
-  .on('error', err => console.log('Redis Client Error', err))
+  .on('error', err => console.log('Client Error', err))
   .connect();
     
 const db = {
@@ -44,8 +44,8 @@ const db = {
   },
 
   deleteUser: async (user) => {
-    await client.sendCommand(['DEL', `pubKey:${user.pubKey}`]);
-    const resp = await client.sendCommand(['DEL', `user:${user.uuid}`]);
+    await client.del(`pubKey:${user.pubKey}`);
+    const resp = await client.del(`user:${user.uuid}`);
 
     return true;
   }
