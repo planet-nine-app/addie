@@ -17,7 +17,7 @@ if(!stripeKey) {
       const response = {
 	paymentIntent: 'foo',
 	ephemeralKey: 'bar',
-	customer: 'baz,
+	customer: 'baz',
 	publishableKey: stripePublishingKey
       };
     
