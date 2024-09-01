@@ -223,6 +223,21 @@ signature message is: timestamp + userUUID</code></summary>
 
 </details>
 
+## Client SDKs
+
+Client SDKs need to generate keys via Sessionless, and implement the networking to interface with the server.
+To do so they should implement the following methods:  
+
+`createUser(saveKeys, getKeys)` - Should generate keys, save them appropriately client side, and PUT to /user/create. 
+
+`addProcessorAccount(uuid, processorPayload)` - Should POST the passed in processor payload to user/:uuid/processor/:processor.
+    
+`getPaymentIntent(uuid, processor, processorPayload)` - For PCI compliance, clients can't just enter payment details and send them to a server. This gets the client-side info needed to display an intent for a processor. POST to user/:uuid/processor/:processor/intent.
+
+`deleteUser(uuid)` - DELETEs the user at user/:uuid
+
+`deleteUser(uuid, hash)` - Should DELETE a user by calling /user/:uuid.
+
 [addie]: https://www.researchgate.net/publication/44843070_Mary_Addison_Hamilton_Australia's_first_lady_of_numbers
 [resolver]: https://github.com/planet-nine-app/MAGIC/blob/main/README-DEV.md#resolvers
 [continuebee]: https://github.com/planet-nine-app/continuebee
