@@ -4,6 +4,8 @@ import user from './src/user/user.js';
 import processors from './src/processors/processors.js';
 import sessionless from 'sessionless-node';
 
+const stripe = processors.stripe;
+
 const allowedTimeDifference = 300000; // keep this relaxed for now
 
 const app = express();
@@ -72,6 +74,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     const processor = req.params.processor;
     const body = req.body;
     const timestamp = body.timestamp;
+    const country = body.country;
     const name = body.name;
     const email = body.email;
     const signature = body.signature;
@@ -89,7 +92,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     let updatedUser = foundUser;
 
     switch(processor) {
-      case 'stripe': updatedUser = await processors.putStripeAccount(foundUser, name, email, ip);
+      case 'stripe': updatedUser = await stripe.putStripeAccount(foundUser, country, name, email, ip);
         break;
       default: throw new Error('processor not found');
     }
@@ -127,7 +130,7 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case 'stripe': paymentTokenResponse = await processors.getStripePaymentIntent(foundUser, amount, currency, payees);
+      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees);
         break;
       default: throw new Error('processor not found');
     }

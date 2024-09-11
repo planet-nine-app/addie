@@ -10,9 +10,7 @@ import addie from 'addie-js';
 const saveKeys = (keys) => { /* handle persisting keys here */ };
 const getKeys = () => { /* return keys here. Can be async */ };
 
-const stateHash = 'add a hash of the current state';
-
-const uuid = await addie.createUser(stateHash, saveKeys, getKeys);
+const uuid = await addie.createUser(saveKeys, getKeys);
 
 // unimplemented const updatedUser = await addie.addProcessorAccount(uuid, /* processorInfo - there is a reference stripe implementation in the repo, but not quite ready for public release yet */);
 
