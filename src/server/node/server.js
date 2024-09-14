@@ -85,7 +85,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     const message = timestamp + uuid
 
     if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
-      res.status = 403;
+      res.status(403);
       return res.send({error: 'Auth error'});
     }
 
@@ -100,7 +100,8 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     res.send(updatedUser);
   } catch(err) {
 console.warn(err);
-    res.status = 404;
+    res.status(404);
+console.log('set status');
     res.send({error: err});
   }
 });
@@ -122,7 +123,7 @@ console.log('trying to get payment intent');
     const message = timestamp + uuid + amount + currency;
 
     if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
-      res.status = 403;
+      res.status(403);
       return res.send({error: 'Auth error'});
     }
 console.log('past auth');
@@ -140,7 +141,7 @@ console.log('paymentTokenResponse', paymentTokenResponse);
     res.send(paymentTokenResponse);
   } catch(err) {
 console.log(err);
-    res.status = 404;
+    res.status(404);
     res.send({error: err});
   }
 });
