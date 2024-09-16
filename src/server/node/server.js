@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import user from './src/user/user.js';
 import processors from './src/processors/processors.js';
+import MAGIC from './src/magic/magic.js';
 import sessionless from 'sessionless-node';
 
 const stripe = processors.stripe;
@@ -143,6 +144,28 @@ console.log('paymentTokenResponse', paymentTokenResponse);
 console.log(err);
     res.status(404);
     res.send({error: err});
+  }
+});
+
+app.post('/magic/spell/:spellName', async (req, res) => {
+  try {
+    const spellName = req.params.spell;
+    const spell = req.body.spell;
+    
+    switch(spellName) {
+      case 'joinup': const resp = await MAGIC.joinup(spell);
+        return res.send(resp);
+        break;
+      case 'linkup': const resp = await MAGIC.linkup(spell);
+        return res.send(resp);
+        break;
+    }
+  
+    res.status(404);
+    res.send({error: 'spell not found'});
+  } catch(err) {
+    res.status(404);
+    res.send({error: 'not found'});
   }
 });
 
