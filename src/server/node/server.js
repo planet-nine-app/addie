@@ -3,6 +3,8 @@ import cors from 'cors';
 import user from './src/user/user.js';
 import processors from './src/processors/processors.js';
 import MAGIC from './src/magic/magic.js';
+import db from './src/persistence/db.js';
+import fount from 'fount-js';
 import sessionless from 'sessionless-node';
 
 const stripe = processors.stripe;
@@ -12,6 +14,30 @@ const allowedTimeDifference = 300000; // keep this relaxed for now
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const SUBDOMAIN = process.env.SUBDOMAIN || 'dev';
+fount.baseURL = `${SUBDOMAIN}.fount.allyabase.com`;
+
+const repeat = (func) => {
+  setTimeout(func, 2000);
+};
+
+const bootstrap = async () => {
+  try {
+    await user.getUserByUUID('addie');
+    sessionless.getKeys = db.getKeys;
+  } catch(err) {
+    const fountUUID = await fount.createUser(db.saveKeys, db.getKeys);
+    const addie = {
+      uuid: 'addie',
+      fountUUID
+    };
+    await db.saveUser(addie);
+    repeat(bootstrap);
+  }
+};
+
+repeat(bootstrap);
 
 app.use((req, res, next) => {
   const requestTime = +req.query.timestamp || +req.body.timestamp;
