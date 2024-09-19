@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { createHash } from 'node:crypto';
 import user from './src/user/user.js';
 import processors from './src/processors/processors.js';
 import MAGIC from './src/magic/magic.js';
@@ -17,6 +18,9 @@ app.use(express.json());
 
 const SUBDOMAIN = process.env.SUBDOMAIN || 'dev';
 fount.baseURL = `${SUBDOMAIN}.fount.allyabase.com`;
+const bdoHashInput = `${SUBDOMAIN}addie`;
+
+const bdoHash = createHash('sha256').update(bdoHashInput).digest('hex');
 
 const repeat = (func) => {
   setTimeout(func, 2000);
@@ -24,15 +28,23 @@ const repeat = (func) => {
 
 const bootstrap = async () => {
   try {
-    await user.getUserByUUID('addie');
-    sessionless.getKeys = db.getKeys;
-  } catch(err) {
-    const fountUUID = await fount.createUser(db.saveKeys, db.getKeys);
+    const { fountUUID = uuid, fountPubKey = pubKey } = await fount.createUser(db.saveKeys, db.getKeys);
+    const bdoUUID = await bdo.createUser(bdoHash, () => {}, db.getKeys);
+    const spellbook = await bdo.getBDO(bdoUUID, bdoHash, fountPubKey);
     const addie = {
       uuid: 'addie',
-      fountUUID
+      fountUUID,
+      fountPubKey,
+      bdoUUID,
+      spellbook
     };
+
+    if(!addie.fountUUID || !addie.bdoUUID || !spellbook) {
+      throw new Error('bootstrap failed');
+    }
+
     await db.saveUser(addie);
+  } catch(err) {
     repeat(bootstrap);
   }
 };
