@@ -6,6 +6,7 @@ import processors from './src/processors/processors.js';
 import MAGIC from './src/magic/magic.js';
 import db from './src/persistence/db.js';
 import fount from 'fount-js';
+import bdo from 'bdo-js';
 import sessionless from 'sessionless-node';
 
 const stripe = processors.stripe;
@@ -17,7 +18,8 @@ app.use(cors());
 app.use(express.json());
 
 const SUBDOMAIN = process.env.SUBDOMAIN || 'dev';
-fount.baseURL = `${SUBDOMAIN}.fount.allyabase.com`;
+fount.baseURL = process.env.LOCALHOST ? 'http://localhost:3006/' : `${SUBDOMAIN}.fount.allyabase.com/`;
+bdo.baseURL = process.env.LOCALHOST ? 'http://localhost:3003/' : `${SUBDOMAIN}.bdo.allyabase.com/`;
 const bdoHashInput = `${SUBDOMAIN}addie`;
 
 const bdoHash = createHash('sha256').update(bdoHashInput).digest('hex');
@@ -28,23 +30,26 @@ const repeat = (func) => {
 
 const bootstrap = async () => {
   try {
-    const { fountUUID = uuid, fountPubKey = pubKey } = await fount.createUser(db.saveKeys, db.getKeys);
-    const bdoUUID = await bdo.createUser(bdoHash, () => {}, db.getKeys);
-    const spellbook = await bdo.getBDO(bdoUUID, bdoHash, fountPubKey);
+    const fountUser = await fount.createUser(db.saveKeys, db.getKeys);
+console.log('f', fountUser);
+    const bdoUUID = await bdo.createUser(bdoHash, {}, () => {}, db.getKeys);
+console.log('b', bdoUUID);
+    const spellbooks = await bdo.getSpellbooks(bdoUUID, bdoHash);
     const addie = {
       uuid: 'addie',
-      fountUUID,
-      fountPubKey,
+      fountUUID: fountUser.uuid,
+      fountPubKey: fountUser.pubKey,
       bdoUUID,
-      spellbook
+      spellbooks
     };
 
-    if(!addie.fountUUID || !addie.bdoUUID || !spellbook) {
+    if(!addie.fountUUID || !addie.bdoUUID || !spellbooks) {
       throw new Error('bootstrap failed');
     }
 
     await db.saveUser(addie);
   } catch(err) {
+console.warn(err);
     repeat(bootstrap);
   }
 };
