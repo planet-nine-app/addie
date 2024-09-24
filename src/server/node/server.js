@@ -191,9 +191,10 @@ console.log(err);
 });
 
 app.post('/magic/spell/:spellName', async (req, res) => {
+console.log('got spell req');
   try {
-    const spellName = req.params.spell;
-    const spell = req.body.spell;
+    const spellName = req.params.spellName;
+    const spell = req.body;
     
     switch(spellName) {
       case 'joinup': const joinupResp = await MAGIC.joinup(spell);
@@ -207,6 +208,7 @@ app.post('/magic/spell/:spellName', async (req, res) => {
     res.status(404);
     res.send({error: 'spell not found'});
   } catch(err) {
+console.warn(err);
     res.status(404);
     res.send({error: 'not found'});
   }

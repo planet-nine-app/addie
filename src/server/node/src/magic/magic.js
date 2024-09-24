@@ -2,20 +2,27 @@ import sessionless from 'sessionless-node';
 import user from '../user/user.js';
 import db from '../persistence/db.js';
 
-sessionless.getKeys = async () => {
-  return await db.getKeys();
-};
+sessionless.generateKeys(() => {}, db.getKeys);
 
 const fountURL = 'http://localhost:3006/';
 
 const MAGIC = {
   joinup: async (spell) => {
-    const gateway = await gatewayForSpell(spell.spellName);
-    spell.gateways.push(spell);
+    const gateway = await MAGIC.gatewayForSpell(spell.spellName);
+    spell.gateways.push(gateway);
+    const spellName = spell.spell;
 
-    const spellbook = await db.get('spellbook');
-    const nextIndex = spellbook.destinations.indexOf(spellbook.destinations.find(($) => $.stopName === 'addie'));
-    const nextDestination = spellbook.destinations[nextIndex].stopURL + '/' + spell.spellName;
+    const addie = await db.getUser('addie');
+    const spellbooks = addie.spellbooks;
+    const spellbook = spellbooks.filter(spellbook => spellbook[spellName]).pop();
+    if(!spellbook) {
+      throw new Error('spellbook not found');
+    }
+
+    const spellEntry = spellbook[spellName];
+    const currentIndex = spellEntry.destinations.indexOf(spellEntry.destinations.find(($) => $.stopName === 'addie'));
+    const nextDestination = spellEntry.destinations[currentIndex + 1].stopURL + spellName;
+console.log('sending spell to', nextDestination);
 
     const res = await MAGIC.forwardSpell(spell, nextDestination);
     const body = await res.json();
@@ -43,7 +50,7 @@ const MAGIC = {
       throw new Error('missing coordinating key');
     }
 
-    const gateway = await gatewayForSpell(spell.spellName);
+    const gateway = await MAGIC.gatewayForSpell(spell.spellName);
     gateway.coordinatingKey = {
       serviceURL: 'http://localhost:3005/', // Once hedy is built, this will be dynamic
       uuid: spell.casterUUID,
@@ -60,7 +67,7 @@ const MAGIC = {
     const addie = await db.getUser('addie');
     const gateway = {
       timestamp: new Date().getTime() + '',
-      uuid: addie.uuid, 
+      uuid: addie.fountUUID, 
       minimumCost: 20,
       ordinal: addie.ordinal
     };      
