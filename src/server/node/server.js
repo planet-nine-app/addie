@@ -195,18 +195,18 @@ console.log('got spell req');
   try {
     const spellName = req.params.spellName;
     const spell = req.body;
-    
-    switch(spellName) {
-      case 'joinup': const joinupResp = await MAGIC.joinup(spell);
-        return res.send(joinupResp);
-        break;
-      case 'linkup': const linkupResp = await MAGIC.linkup(spell);
-        return res.send(linkupResp);
-        break;
+
+    if(!MAGIC[spellName]) {
+console.log('sending this back'); 
+      res.status(404);
+      res.send({error: 'spell not found'});
     }
-  
-    res.status(404);
-    res.send({error: 'spell not found'});
+
+    let spellResp = {};
+    spellResp = await MAGIC[spellName](spell);
+console.log('spellResp', spellResp);
+    res.status(spellResp.success ? 200 : 900);
+    return res.send(spellResp);
   } catch(err) {
 console.warn(err);
     res.status(404);
