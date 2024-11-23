@@ -126,7 +126,7 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
 
     const foundUser = await user.getUserByUUID(uuid);
 
-    const message = timestamp + uuid
+    const message = timestamp + uuid + name + email;
 
     if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
       res.status(403);

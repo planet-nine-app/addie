@@ -56,7 +56,7 @@ it('should put an account to a processor', async () => {
     email: "zach+" + (Math.floor(Math.random() * 100000)) + "@planetnine.app"
   };
 
-  const message = payload.timestamp + savedUser.uuid;
+  const message = payload.timestamp + savedUser.uuid + payload.name + payload.email;
 
   payload.signature = await sessionless.sign(message);
 

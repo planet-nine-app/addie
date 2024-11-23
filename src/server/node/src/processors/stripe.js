@@ -1,10 +1,13 @@
 import user from '../user/user.js';
 import sessionless from 'sessionless-node';
-import { default as processorKeys } from '../../config/default.js';
+import { default as processorKeys } from '../../config/default-stripe.js';
 //import { stripeKey, stripePublishingKey } from '../../config/default.js';
 import _stripe from 'stripe';
 const stripeKey = processorKeys.stripeKey || process.env.STRIPE_KEY;
 const stripePublishingKey = processorKeys.stripePublishingKey || process.env.STRIPE_PUBLISHING_KEY;
+
+console.log('processorKeys are', processorKeys);
+console.log('stripeKey', stripeKey);
 
 // need to think through this case a bit more
 if(!stripeKey) {

@@ -15,6 +15,11 @@ it('should register a user', async () => {
   savedUser.uuid.length.should.equal(36);
 });
 
+it('should get a user', async () => {
+  const addieUser = await addie.getUserByUUID(savedUser.uuid);
+  addieUser.uuid.should.equal(savedUser.uuid);
+});
+
 it('should add processor account', async () => {
   const res = await addie.addProcessorAccount(savedUser.uuid, {});
   res.should.equal('unimplemented');

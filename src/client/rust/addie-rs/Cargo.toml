@@ -1,0 +1,13 @@
+[package]
+name = "addie-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sessionless = "0.1.1"
+reqwest = { version = "0.12.4", features = ["blocking", "json"] }
+serde = { version = "1.0.199", features = ["derive"] }
+serde_json = "1.0"
+actix-rt = "*"
+once_cell = "*"
+rand = "*"

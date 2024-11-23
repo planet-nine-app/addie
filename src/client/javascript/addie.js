@@ -50,6 +50,19 @@ const addie = {
     return uuid;
   },
 
+  getUserByUUID: async (uuid) => {
+    const timestamp = new Date().getTime() + '';
+    
+    const message = timestamp + uuid;
+    
+    const signature = await sessionless.sign(message);
+
+    const res = await get(`${addie.baseURL}user/${uuid}?signature=${signature}&timestamp=${timestamp}`);
+    const user = res.json();
+    
+    return user;
+  },
+
   addProcessorAccount: async (uuid, processorPayload) => {
     return 'unimplemented';
   },
