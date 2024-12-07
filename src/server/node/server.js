@@ -190,6 +190,45 @@ console.log(err);
   }
 });
 
+app.post('/user/:uuid/processor/:processor/intent-without-splits', async (req, res) => {
+  try {
+console.log('trying to get payment intent');
+    const uuid = req.params.uuid;
+    const processor = req.params.processor;
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const amount = body.amount;
+    const currency = body.currency;
+    const signature = body.signature;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    const message = timestamp + uuid + amount + currency;
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+console.log('past auth');
+
+    let paymentTokenResponse;
+
+    switch(processor) {
+      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntentWithoutSplits(foundUser, amount, currency);
+        break;
+      default: throw new Error('processor not found');
+    }
+
+console.log('paymentTokenResponse', paymentTokenResponse);
+
+    res.send(paymentTokenResponse);
+  } catch(err) {
+console.log(err);
+    res.status(404);
+    res.send({error: err});
+  }
+});
+
 app.post('/magic/spell/:spellName', async (req, res) => {
 console.log('got spell req');
   try {

@@ -95,3 +95,14 @@ pub struct PaymentIntent {
     pub publishable_key: String
 }
 
+impl PaymentIntent {
+    pub fn new() -> Self {
+        PaymentIntent {
+            payment_intent: "".to_string(),
+            ephemeral_key: "".to_string(),
+            customer: "".to_string(),
+            publishable_key: "".to_string()
+        }
+    }
+}
+

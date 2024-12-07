@@ -17,6 +17,7 @@
     "express": "^4.19.2",
     "fount-js": "^0.0.3",
     "sessionless-node": "^0.10.1",
-    "stripe": "^16.8.0"
+    "stripe": "^16.8.0",
+    "ws": "^8.18.0"
   }
 }

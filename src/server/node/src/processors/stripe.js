@@ -120,9 +120,53 @@ console.log('sending');
       customer: customerId,
       publishableKey: stripePublishingKey
     };
+
+    // No, let's do the payment intent, and then resolve the money splitting with MAGIC.
+    // We can store value on the user here, and resolve it with magic after creating the splits.
+
+    // let's websocket!
   
+    // This needs to happen after the payment is confirmed...
+    return response;
+  },
+
+  getStripePaymentIntentWithoutSplits: async (foundUser, amount, currency) => {
+    const customerId = foundUser.stripeCustomerId || (await stripeSDK.customers.create()).id;
+    if(foundUser.stripeCustomerId !== customerId) {
+      foundUser.stripeCustomerId = customerId;
+      await user.saveUser(foundUser);
+    }
+
+    const ephemeralKey = await stripeSDK.ephemeralKeys.create(
+      {customer: customerId},
+      {apiVersion: '2024-06-20'}
+    );
+
+    const groupName = 'group_' + foundUser.uuid;
+
+    const paymentIntent = await stripeSDK.paymentIntents.create({
+      amount: amount,
+      currency: currency,
+      customer: customerId,
+      // In the latest version of the API, specifying the `automatic_payment_methods` parameter
+      // is optional because Stripe enables its functionality by default.
+      automatic_payment_methods: {
+	enabled: true,
+      },
+      transfer_group: groupName
+    });
+
+    const response = {
+      paymentIntent: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: customerId,
+      publishableKey: stripePublishingKey
+    };
+
     return response;
   }
 };
+
+
 
 export default stripe;

@@ -1,4 +1,4 @@
-mod structs;
+pub mod structs;
 
 #[cfg(test)]
 mod tests;
@@ -19,11 +19,11 @@ pub struct Addie {
 }
 
 impl Addie {
-    pub fn new(base_url: Option<String>) -> Self {
+    pub fn new(base_url: Option<String>, sessionless: Option<Sessionless>) -> Self {
         Addie {
             base_url: base_url.unwrap_or("https://dev.addie.allyabase.com/".to_string()),
             client: Client::new(),
-            sessionless: Sessionless::new(),
+            sessionless: sessionless.unwrap_or(Sessionless::new()),
         }
     }
 
@@ -126,6 +126,25 @@ impl Addie {
         }).as_object().unwrap().clone();
 
         let url = format!("{}user/{}/processor/{}/intent", self.base_url, uuid, processor);
+        let res = self.post(&url, serde_json::Value::Object(payload)).await?;
+        let intent: PaymentIntent = res.json().await?;
+
+        Ok(intent)
+    }
+
+    pub async fn get_payment_intent_without_splits(&self, uuid: &str, processor: &str, amount: &u32, currency: &str) -> Result<PaymentIntent, Box<dyn std::error::Error>> {
+        let timestamp = Self::get_timestamp();
+        let message = format!("{}{}{}{}", timestamp, uuid, amount, currency);
+        let signature = self.sessionless.sign(&message).to_hex();
+
+        let payload = json!({
+            "timestamp": timestamp,
+            "amount": amount,
+            "currency": currency,
+            "signature": signature
+        }).as_object().unwrap().clone();
+
+        let url = format!("{}user/{}/processor/{}/intent-without-splits", self.base_url, uuid, processor);
         let res = self.post(&url, serde_json::Value::Object(payload)).await?;
         let intent: PaymentIntent = res.json().await?;
 

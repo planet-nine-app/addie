@@ -91,6 +91,25 @@ async fn test_addie() {
         }
     }
 
+    async fn get_payment_intent_without_splits(addie: &Addie, saved_user: &AddieUser) -> Option<PaymentIntent> {
+        let result = addie.get_payment_intent_without_splits(&saved_user.uuid, "stripe", &2000, "USD").await;
+
+        match result {
+            Ok(intent) => {
+                assert_eq!(
+                    intent.customer.len(),
+                    18
+                );
+                Some(intent)
+            }
+            Err(error) => {
+                eprintln!("Error occurred get_user: {}", error);
+                println!("Error details: {:?}", error);
+                None
+            }
+        }
+    }
+
     async fn delete_user(addie: &Addie, saved_user: &AddieUser) -> Option<SuccessResult> {
         let result = addie.delete_user(&saved_user.uuid).await;
 
@@ -127,6 +146,13 @@ async fn test_addie() {
 
     if let Some(ref user) = saved_user {
         Some(get_payment_intent(&addie, user).await.expect("get payment intent"));
+        saved_user = Some(get_user_by_uuid(&addie, user).await.expect("getting payment intent"));
+    } else {
+        panic!("Failed to get payment intent");
+    }
+
+    if let Some(ref user) = saved_user {
+        Some(get_payment_intent_without_splits(&addie, user).await.expect("get payment intent without splits"));
         saved_user = Some(get_user_by_uuid(&addie, user).await.expect("getting payment intent"));
     } else {
         panic!("Failed to get payment intent");
