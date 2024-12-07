@@ -164,6 +164,39 @@ console.log('sending');
     };
 
     return response;
+  },
+
+  payPayees: async (payees, amount) => {
+    const paidOutAmount = payees.reduce((a, c) => a + c.amount);
+    if(paidOutAmount > amount) {
+      return false;
+    }
+    try {
+      let accountsAndAmounts = [];
+      for(var i = 0; i < payees.count; i++) {
+	const payee = payees[i];
+	const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
+	accountsAndAmounts.push({
+	  account,
+	  amount: payee.amount
+	});
+      }
+
+      const transferPromises = accountsAndAmounts.map(accountAndAmount => {
+	return stripeSDK.transfers.create({
+	  amount: accountAndAmount.amount,
+	  currency: 'usd',
+	  destination: accountAndAmount.account,
+	  transfer_group: groupName
+	});
+      });
+      await Promise.all(transferPromises);
+
+      return true;
+    } catch(err) {
+console.warn(err);
+      return false;
+    }
   }
 };
 

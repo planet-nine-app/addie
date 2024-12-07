@@ -253,6 +253,44 @@ console.warn(err);
   }
 });
 
+app.post('/money/processor/:processor/user/:uuid', async (req, res) => {
+  try {
+    const processor = req.params.processor;
+    const uuid = req.params.uuid;
+    const timestamp = req.body.timestamp;
+    const caster = req.body.caster;
+    const spell = req.body.spell;
+    const payees = req.body.gatewayUsers;
+    const message = timestamp + message;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+console.log('past auth');
+
+    if(foundUser[processor].stored < spell.totalCost) {
+      return {success: false};
+    }
+
+    let paidOutResult;
+    switch(processor) {
+      case 'stripe': await stripe.payPayees(payees, spell.totalCost);
+        break;
+      default: throw new Error('processor not found');
+    }
+    
+    res.send({success: paidOutResult});  
+
+  } catch(err) {
+console.warn(err);
+    res.status(404);
+    res.send({error: 'not found'});
+  }
+});
+
 app.delete('/user/:uuid', async (req, res) => {
   try {
     const uuid = req.params.uuid;
