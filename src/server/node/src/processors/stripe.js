@@ -168,7 +168,7 @@ console.log('sending');
 
   payPayees: async (payees, amount) => {
 console.log('payees', payees);
-    const paidOutAmount = payees.reduce((a, c) => a + (c.minimumCost - c.minimumCost * 0.05));
+    const paidOutAmount = payees.reduce((a, c) => a + (c.minimumCost - c.minimumCost * 0.05), 0);
 console.log('paidOutAmount', paidOutAmount);
     if(paidOutAmount > amount) {
       return false;
