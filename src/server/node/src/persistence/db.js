@@ -30,10 +30,6 @@ console.log('throwing');
   putUser: async (user) => {
     const uuid = sessionless.generateUUID();
     user.uuid = uuid;
-    user.keys = {
-      interactingKeys: {},
-      coordinatingKeys: {}
-    };
     await client.set(`user:${uuid}`, JSON.stringify(user));
     await client.set(`pubKey:${user.pubKey}`, uuid);
     return uuid;

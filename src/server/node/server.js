@@ -275,7 +275,7 @@ console.log('caster', caster);
     const addieCaster = await user.getUserByPublicKey(caster.pubKey);
 console.log('addieCaster', addieCaster);
 
-    if(!caster[processor] || caster[processor].stored < spell.totalCost) {
+    if(!addieCaster[processor] || addieCaster[processor].stored < spell.totalCost) {
       return res.send({success: false});
     }
 

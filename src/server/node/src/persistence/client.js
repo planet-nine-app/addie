@@ -7,7 +7,7 @@ const delimiter = config.delimiter || '_';
 const basePath = config.basePath || 'data';
 
 const filePathForKey = async (key) => {
-  let mutatingKey = key.replace(':', delimiter);
+  let mutatingKey = key.replace(':', delimiter).trim();
   const filePathParts = [];
   for(let i = 0; i < keyDepth; i++) {
     filePathParts.push(mutatingKey.slice(-3));
