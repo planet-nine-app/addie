@@ -167,7 +167,9 @@ console.log('sending');
   },
 
   payPayees: async (payees, amount) => {
+console.log('payees', payees);
     const paidOutAmount = payees.reduce((a, c) => a + (c.amount - c.amount * 0.05));
+console.log('paidOutAmount', paidOutAmount);
     if(paidOutAmount > amount) {
       return false;
     }

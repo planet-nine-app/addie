@@ -260,7 +260,7 @@ app.post('/money/processor/:processor/user/:uuid', async (req, res) => {
     const timestamp = req.body.timestamp;
     const caster = req.body.caster;
     const spell = req.body.spell;
-    const payees = req.body.gatewayUsers;
+    const payees = spell.gateways;
     const signature = req.body.signature;
     const message = timestamp + uuid;
 
@@ -281,7 +281,7 @@ console.log('addieCaster', addieCaster);
 
     let paidOutResult;
     switch(processor) {
-      case 'stripe': await stripe.payPayees(payees, spell.totalCost);
+      case 'stripe': paidOutResult = await stripe.payPayees(payees, spell.totalCost);
         break;
       default: throw new Error('processor not found');
     }
