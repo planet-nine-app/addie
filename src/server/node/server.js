@@ -283,7 +283,7 @@ console.log('addieCaster', addieCaster);
     payees = payees.map(payee => {
       payee.pubKey = gatewayUsers.find($ => $.uuid === payee.uuid).pubKey;
       return payee;
-    };
+    });
 
     let paidOutResult;
     switch(processor) {
