@@ -166,7 +166,7 @@ console.log('sending');
     return response;
   },
 
-  payPayees: async (payees, amount) => {
+  payPayees: async (payees, groupName, amount) => {
 console.log('payees', payees);
     const paidOutAmount = payees.reduce((a, c) => a + (c.minimumCost - c.minimumCost * 0.05), 0);
 console.log('paidOutAmount', paidOutAmount);

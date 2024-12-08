@@ -285,9 +285,11 @@ console.log('addieCaster', addieCaster);
       return payee;
     });
 
+    const groupName = 'group_' + addieCaster.uuid;
+
     let paidOutResult;
     switch(processor) {
-      case 'stripe': paidOutResult = await stripe.payPayees(payees, spell.totalCost);
+      case 'stripe': paidOutResult = await stripe.payPayees(payees, groupName, spell.totalCost);
         break;
       default: throw new Error('processor not found');
     }
