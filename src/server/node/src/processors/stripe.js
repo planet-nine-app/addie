@@ -170,6 +170,7 @@ console.log('sending');
 console.log('payees', payees);
     const paidOutAmount = payees.reduce((a, c) => a + (c.minimumCost - c.minimumCost * 0.05), 0);
 console.log('paidOutAmount', paidOutAmount);
+console.log('amount', amount);
     if(paidOutAmount > amount) {
       return false;
     }
@@ -180,9 +181,10 @@ console.log('paidOutAmount', paidOutAmount);
 	const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
 	accountsAndAmounts.push({
 	  account,
-	  amount: (payee.amount - payee.amount * 0.05)
+	  amount: (payee.minimumCost - payee.minimumCost * 0.05)
 	});
       }
+console.log('accountsAndAmounrs', accountsAndAmounts);
 
       const transferPromises = accountsAndAmounts.map(accountAndAmount => {
 	return stripeSDK.transfers.create({
@@ -192,7 +194,8 @@ console.log('paidOutAmount', paidOutAmount);
 	  transfer_group: groupName
 	});
       });
-      await Promise.all(transferPromises);
+      const promResults = await Promise.all(transferPromises);
+console.log(promResults);
 
       return true;
     } catch(err) {
