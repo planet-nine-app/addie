@@ -272,7 +272,7 @@ app.post('/money/processor/:processor/user/:uuid', async (req, res) => {
     }
 console.log('past auth');
 console.log('caster', caster);
-    const addieCaster = await user.getUserByPubKey(caster.pubKey);
+    const addieCaster = await user.getUserByPublicKey(caster.pubKey);
 console.log('addieCaster', addieCaster);
 
     if(!caster[processor] || caster[processor].stored < spell.totalCost) {
