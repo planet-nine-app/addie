@@ -261,7 +261,8 @@ app.post('/money/processor/:processor/user/:uuid', async (req, res) => {
     const caster = req.body.caster;
     const spell = req.body.spell;
     const payees = req.body.gatewayUsers;
-    const message = timestamp + message;
+    const signature = req.body.signature;
+    const message = timestamp + uuid;
 
     const foundUser = await user.getUserByUUID(uuid);
 
