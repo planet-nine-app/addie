@@ -271,9 +271,12 @@ app.post('/money/processor/:processor/user/:uuid', async (req, res) => {
       return res.send({error: 'Auth error'});
     }
 console.log('past auth');
+console.log('caster', caster);
+    const addieCaster = await user.getUserByPubKey(casterPubKey);
+console.log('addieCaster', addieCaster);
 
-    if(foundUser[processor].stored < spell.totalCost) {
-      return {success: false};
+    if(!caster[processor] || caster[processor].stored < spell.totalCost) {
+      return res.send({success: false});
     }
 
     let paidOutResult;

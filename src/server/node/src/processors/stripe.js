@@ -167,7 +167,7 @@ console.log('sending');
   },
 
   payPayees: async (payees, amount) => {
-    const paidOutAmount = payees.reduce((a, c) => a + c.amount);
+    const paidOutAmount = payees.reduce((a, c) => a + (c.amount - c.amount * 0.05));
     if(paidOutAmount > amount) {
       return false;
     }
@@ -178,7 +178,7 @@ console.log('sending');
 	const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
 	accountsAndAmounts.push({
 	  account,
-	  amount: payee.amount
+	  amount: (payee.amount - payee.amount * 0.05)
 	});
       }
 
