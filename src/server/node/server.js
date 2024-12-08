@@ -260,9 +260,10 @@ app.post('/money/processor/:processor/user/:uuid', async (req, res) => {
     const timestamp = req.body.timestamp;
     const caster = req.body.caster;
     const spell = req.body.spell;
-    const payees = spell.gateways;
+    const gatewayUsers = req.body.gatewayUsers;
     const signature = req.body.signature;
     const message = timestamp + uuid;
+    let payees = spell.gateways;
 
     const foundUser = await user.getUserByUUID(uuid);
 
@@ -278,6 +279,11 @@ console.log('addieCaster', addieCaster);
     if(!addieCaster[processor] || addieCaster[processor].stored < spell.totalCost) {
       return res.send({success: false});
     }
+
+    payees = payees.map(payee => {
+      payee.pubKey = gatewayUsers.find($ => $.uuid === payee.uuid).pubKey;
+      return payee;
+    };
 
     let paidOutResult;
     switch(processor) {
