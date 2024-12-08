@@ -94,7 +94,7 @@ const stripe = {
     });
 
     let accountsAndAmounts = [];
-    for(var i = 0; i < payees.count; i++) {
+    for(var i = 0; i < payees.length; i++) {
       const payee = payees[i];
       const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
       accountsAndAmounts.push({
