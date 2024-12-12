@@ -67,8 +67,25 @@ const addie = {
     return 'unimplemented';
   },
 
-  getPaymentIntent: async (uuid, processor, processorPayload) => {
-    return 'unimplemented';
+  getPaymentIntent: async (uuid, processor, amount, currency, payees) => {
+    const timestamp = Self::get_timestamp();
+    const message = timestamp + uuid + amount + currency;
+    const signature = await sessionless.sign(message);
+
+    const payload = {
+	timestamp,
+	amount,
+	currency,
+	"payees": payees,
+	"signature": signature
+    }).as_object().unwrap().clone();
+
+    const url = `${baseURL}user/${uuid}/processor/${processor}/intent`;
+    let res = self.post(&url, serde_json::Value::Object(payload)).await?;   //  Start here
+    let intent: PaymentIntent = res.json().await?;
+
+    Ok(intent)
+
   },
 
   deleteUser: async (uuid) => {
