@@ -58,7 +58,7 @@ const addie = {
     const signature = await sessionless.sign(message);
 
     const res = await get(`${addie.baseURL}user/${uuid}?signature=${signature}&timestamp=${timestamp}`);
-    const user = res.json();
+    const user = await res.json();
     
     return user;
   },
@@ -68,7 +68,7 @@ const addie = {
   },
 
   getPaymentIntent: async (uuid, processor, amount, currency, payees) => {
-    const timestamp = Self::get_timestamp();
+    const timestamp = new Date().getTime() + '';
     const message = timestamp + uuid + amount + currency;
     const signature = await sessionless.sign(message);
 
@@ -78,14 +78,32 @@ const addie = {
 	currency,
 	"payees": payees,
 	"signature": signature
-    }).as_object().unwrap().clone();
+    };
 
-    const url = `${baseURL}user/${uuid}/processor/${processor}/intent`;
-    let res = self.post(&url, serde_json::Value::Object(payload)).await?;   //  Start here
-    let intent: PaymentIntent = res.json().await?;
+    const url = `${addie.baseURL}user/${uuid}/processor/${processor}/intent`;
+    const res = await post(url, payload);   //  Start here
+    const intent = await res.json();
 
-    Ok(intent)
+    return intent;
+  },
 
+  getPaymentIntentWithoutSplits: async (uuid, processor, amount, currency) => {
+    const timestamp = new Date().getTime() + '';
+    const message = timestamp + uuid + amount + currency;
+    const signature = await sessionless.sign(message);
+
+    const payload = {
+	timestamp,
+	amount,
+	currency,
+	"signature": signature
+    };
+
+    const url = `${addie.baseURL}user/${uuid}/processor/${processor}/intent-without-splits`;
+    const res = await post(url, payload);   //  Start here
+    const intent = await res.json();
+
+    return intent;
   },
 
   deleteUser: async (uuid) => {
