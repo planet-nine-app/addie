@@ -10,6 +10,7 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "dependencies": {
+    "@square/web-sdk": "^2.0.1",
     "bdo-js": "0.0.4",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",

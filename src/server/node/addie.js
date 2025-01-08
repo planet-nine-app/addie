@@ -159,6 +159,7 @@ console.log('trying to get payment intent');
     const timestamp = body.timestamp;
     const amount = body.amount;
     const currency = body.currency;
+    const nonce = body.nonce;
     const payees = body.payees;
     const signature = body.signature;
 
@@ -172,10 +173,14 @@ console.log('trying to get payment intent');
     }
 console.log('past auth');
 
+    foundUser.nonce = nonce;
+
     let paymentTokenResponse;
 
     switch(processor) {
       case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees);
+        break;
+      case 'square': paymentTokenResponse = await square.getSquarePaymentIntent(foundUser, amount, currency, payees);
         break;
       default: throw new Error('processor not found');
     }

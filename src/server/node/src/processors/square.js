@@ -2,38 +2,24 @@ import user from '../user/user.js';
 import sessionless from 'sessionless-node';
 import { default as processorKeys } from '../../config/default-square.js';
 import { Client, Environment } from 'square';
-import { randomBytes } from 'crypto';
 const squareKey = processorKeys.squareKey || process.env.SQUARE_KEY;
 
-// need to think through this case a bit more
 if(!squareKey) {
-  const processors = {
-    putSquareAccount: async (foundUser, name, email, ip) => {
-      foundUser.squareAccountId = 'ff33ee';
-      return foundUser;
-    },
-    getSquarePaymentIntent: async (foundUser, amount, currency, payees) => {
-      const response = {
-	paymentIntent: 'foo',
-	ephemeralKey: 'bar',
-	customer: 'baz',
-	publishableKey: 'bop'
-      };
-    
-      return response;
-    }
-  };
+  throw new Error('add config!');
 }
 
-const squareSDK = new Client({
-  accessToken: squareKey,
-  environment: Environment.Sandbox
+console.log('processorKeys are', processorKeys);
+
+const client = new Client({
+  environment: Environment.Sandbox,
+  accessToken: squareKey
 });
+
+const squareSDK = {...client.paymentsApi, ...client.customersApi};
 
 const square = {
   putSquareAccount: async (foundUser, country, name, email, ip) => {
-    throw new Error('not implemented');
-/*    const account = await squareSDK.accounts.create({
+    const account = await squareSDK.accounts.create({
       country: country,
       email: email,
       business_type: 'individual',
@@ -55,85 +41,60 @@ const square = {
 	  payments: 'application',
 	},
         requirement_collection: 'application',
-	square_dashboard: {
+	stripe_dashboard: {
 	  type: 'none',
 	},
       },
     });
 
-    foundUser.squareAccountId = account.id;
+    foundUser.stripeAccountId = account.id;
     await user.saveUser(foundUser);
 
-    return foundUser; */
+    return foundUser;
   },
 
   getSquarePaymentIntent: async (foundUser, amount, currency, payees) => {
-    const customerId = foundUser.squareCustomerId || (await squareSDK.customers.create()).id;
+    const customerId = foundUser.squareCustomerId || (await squareSDK.createCustomer({idempotencyKey: crypto.randomUUID()});
     if(foundUser.squareCustomerId !== customerId) {
       foundUser.squareCustomerId = customerId;
       await user.saveUser(foundUser);
     }
 
-    const ephemeralKey = await squareSDK.ephemeralKeys.create(
-      {customer: customerId},
-      {apiVersion: '2024-06-20'}
-    );
-
-    const groupName = 'group_' + foundUser.uuid;
-
-    const paymentIntent = await squareSDK.paymentIntents.create({
-      amount: amount,
-      currency: currency,
-      customer: customerId,
-      // In the latest version of the API, specifying the `automatic_payment_methods` parameter
-      // is optional because Square enables its functionality by default.
-      automatic_payment_methods: {
-	enabled: true,
+    const payment = {
+      idempotencyKey: crypto.randomUUID(),
+      customerId: foundUser.squareCustomerId,
+      sourceId: foundUser.nonce,
+      amountMoney: {
+	amount: amount + '',
+	currency: currency,
       },
-      transfer_group: groupName
-    });
-
-    let accountsAndAmounts = [];
-    for(var i = 0; i < payees.length; i++) {
-      const payee = payees[i];
-      const account = (await user.getUserByPublicKey(payee.pubKey)).squareAccountId;
-      accountsAndAmounts.push({
-        account,
-        amount: payee.amount
-      });
-    }
-
-    const transferPromises = accountsAndAmounts.map(accountAndAmount => {
-      return squareSDK.transfers.create({
-	amount: accountAndAmount.amount,
-	currency: 'usd',
-	destination: accountAndAmount.account,
-	transfer_group: groupName
-      });
-    });
-    await Promise.all(transferPromises);
-console.log('transferPromises');
-console.log('sending');
-    const response = {
-      paymentIntent: paymentIntent.client_secret,
-      ephemeralKey: ephemeralKey.secret,
-      customer: customerId,
-      publishableKey: squarePublishingKey
     };
 
-    // No, let's do the payment intent, and then resolve the money splitting with MAGIC.
-    // We can store value on the user here, and resolve it with magic after creating the splits.
+    for(const payee of payees) {
+        const merchantId = (await user.getUserByPublicKey(payee.pubKey)).squareMerchantId;
+        
+        await paymentsApi.createPayment({
+            sourceId: 'MERCHANT_' + merchantId,
+            amountMoney: {
+                amount: payee.amount,
+                currency: 'USD'
+            },
+            idempotencyKey: crypto.randomUUID()
+        });
+    }
 
-    // let's websocket!
-  
-    // This needs to happen after the payment is confirmed...
-    return response;
+    return {
+      payment: payment,
+      merchantId: process.env.SQUARE_MERCHANT_ID,
+      locationId: process.env.SQUARE_LOCATION_ID,
+      customerId: customerId 
+    };
   },
 
   getSquarePaymentIntentWithoutSplits: async (foundUser, amount, currency) => {
-    const customerId = foundUser.squareCustomerId || (await squareSDK.customers.create()).id;
-    if(foundUser.squareCustomerId !== customerId) {
-      foundUser.squareCustomerId = customerId;
+    const customerId = foundUser.stripeCustomerId || (await squareSDK.customers.create()).id;
+    if(foundUser.stripeCustomerId !== customerId) {
+      foundUser.stripeCustomerId = customerId;
       await user.saveUser(foundUser);
     }
 
@@ -160,7 +121,7 @@ console.log('sending');
       paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
       customer: customerId,
-      publishableKey: squarePublishingKey
+      publishableKey: stripePublishingKey
     };
 
     return response;
@@ -178,7 +139,7 @@ console.log('amount', amount);
       let accountsAndAmounts = [];
       for(var i = 0; i < payees.length; i++) {
 	const payee = payees[i];
-	const account = (await user.getUserByPublicKey(payee.pubKey)).squareAccountId;
+	const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
 	accountsAndAmounts.push({
 	  account,
 	  amount: (payee.minimumCost - payee.minimumCost * 0.05)
@@ -207,4 +168,4 @@ console.warn(err);
 
 
 
-export default square;
+export default stripe;
