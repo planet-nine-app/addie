@@ -1,8 +1,7 @@
 import user from '../user/user.js';
 import sessionless from 'sessionless-node';
-import { default as processorKeys } from '../../config/default-square.js';
 import { Client, Environment } from 'square';
-const squareKey = processorKeys.squareKey || process.env.SQUARE_KEY;
+const squareKey = process.env.SQUARE_KEY;
 
 if(!squareKey) {
   throw new Error('add config!');
