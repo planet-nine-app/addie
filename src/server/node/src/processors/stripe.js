@@ -4,7 +4,6 @@ import _stripe from 'stripe';
 const stripeKey = process.env.STRIPE_KEY;
 const stripePublishingKey = process.env.STRIPE_PUBLISHING_KEY;
 
-console.log('processorKeys are', processorKeys);
 console.log('stripeKey', stripeKey);
 
 // need to think through this case a bit more
