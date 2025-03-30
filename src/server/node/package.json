@@ -11,13 +11,13 @@
   "type": "module",
   "dependencies": {
     "@square/web-sdk": "^2.0.1",
-    "bdo-js": "0.0.4",
+    "bdo-js": "latest",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dayjs": "^1.11.13",
     "express": "^4.19.2",
-    "fount-js": "0.0.3",
-    "sessionless-node": "^0.11.0",
+    "fount-js": "latest",
+    "sessionless-node": "latest",
     "stripe": "^16.8.0",
     "ws": "^8.18.0"
   }
