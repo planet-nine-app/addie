@@ -43,7 +43,7 @@ console.log('b', bdoUUID);
       spellbooks
     };
 
-    if(!addie.fountUUID || !addie.bdoUUID || !spellbooks || spellbooks.length === 0) {
+    if(!addie.fountUUID || !addie.bdoUUID || !spellbooks) {
       throw new Error('bootstrap failed');
     }
 
