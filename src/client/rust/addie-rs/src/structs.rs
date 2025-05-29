@@ -106,3 +106,9 @@ impl PaymentIntent {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct Payee {
+    pub pubKey: String,
+    pub amount: i32
+}

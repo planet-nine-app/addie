@@ -10,7 +10,7 @@ use sessionless::hex::IntoHex;
 use sessionless::{Sessionless, Signature};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::HashMap;
-use crate::structs::{AddieUser, Gateway, Nineum, Spell, SpellResult, SuccessResult, PaymentIntent};
+use crate::structs::{AddieUser, Gateway, Nineum, Spell, SpellResult, SuccessResult, PaymentIntent, Payee};
 
 pub struct Addie {
     base_url: String,
@@ -112,7 +112,7 @@ impl Addie {
         Ok(user)
     }
 
-    pub async fn get_payment_intent(&self, uuid: &str, processor: &str, amount: &u32, currency: &str, payees: &Vec<String>) -> Result<PaymentIntent, Box<dyn std::error::Error>> {
+    pub async fn get_payment_intent(&self, uuid: &str, processor: &str, amount: &u32, currency: &str, payees: &Vec<Payee>) -> Result<PaymentIntent, Box<dyn std::error::Error>> {
         let timestamp = Self::get_timestamp();
         let message = format!("{}{}{}{}", timestamp, uuid, amount, currency);
         let signature = self.sessionless.sign(&message).to_hex();
