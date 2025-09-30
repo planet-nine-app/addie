@@ -64,7 +64,7 @@ const stripe = {
     return foundUser;
   },
 
-  getStripePaymentIntent: async (foundUser, amount, currency, payees) => {
+  getStripePaymentIntent: async (foundUser, amount, currency, payees, savePaymentMethod = false) => {
     const customerId = foundUser.stripeCustomerId || (await stripeSDK.customers.create()).id;
     if(foundUser.stripeCustomerId !== customerId) {
       foundUser.stripeCustomerId = customerId;
@@ -77,8 +77,8 @@ const stripe = {
     );
 
     const groupName = 'group_' + foundUser.uuid;
-
-    const paymentIntent = await stripeSDK.paymentIntents.create({
+    
+    const paymentIntentData = {
       amount: amount,
       currency: currency,
       customer: customerId,
@@ -88,7 +88,13 @@ const stripe = {
 	enabled: true,
       },
       transfer_group: groupName
-    });
+    };
+
+    if(savePaymentMethod) {
+      paymentIntentData.setup_future_usage = 'off_session';
+    }
+
+    const paymentIntent = await stripeSDK.paymentIntents.create(paymentIntentData);
 
     let accountsAndAmounts = [];
     for(var i = 0; i < payees.length; i++) {
@@ -127,7 +133,7 @@ console.log('sending');
     return response;
   },
 
-  getStripePaymentIntentWithoutSplits: async (foundUser, amount, currency) => {
+  getStripePaymentIntentWithoutSplits: async (foundUser, amount, currency, savePaymentMethod = false) => {
     const customerId = foundUser.stripeCustomerId || (await stripeSDK.customers.create()).id;
     if(foundUser.stripeCustomerId !== customerId) {
       foundUser.stripeCustomerId = customerId;
@@ -141,7 +147,7 @@ console.log('sending');
 
     const groupName = 'group_' + foundUser.uuid;
 
-    const paymentIntent = await stripeSDK.paymentIntents.create({
+    const paymentIntentData = {
       amount: amount,
       currency: currency,
       customer: customerId,
@@ -151,7 +157,13 @@ console.log('sending');
 	enabled: true,
       },
       transfer_group: groupName
-    });
+    };
+
+    if(savePaymentMethod) {
+      paymentIntentData.setup_future_usage = 'off_session';
+    }
+
+    const paymentIntent = await stripeSDK.paymentIntents.create(paymentIntentData);
 
     const response = {
       paymentIntent: paymentIntent.client_secret,
@@ -230,7 +242,107 @@ console.log('sending');
     return response;
   },
 
+  getSavedPaymentMethods: async (foundUser, type = 'card') => {
+    if(!foundUser.stripeCustomerId) {
+      return { paymentMethods: [] };
+    }
 
+    try {
+      const allPaymentMethods = await stripeSDK.paymentMethods.list({
+        customer: foundUser.stripeCustomerId,
+        type: type
+      });
+
+      const paymentMethods = paymentMethods.data.filter(pm => {
+        return pm.allow_redisplay === 'always';
+      });
+
+      return {
+        paymentMethods,
+        customerId: foundUser.stripeCustomerId
+      };
+    } catch(error) {
+console.error('Error fetching payment methods:', error);
+      throw error;
+    }
+  },
+
+  chargeWithSavedPaymentMethod: async (foundUser, amount, currency, paymentMethodId, payees = []) => {
+    if(!foundUser.stripeCustomerId) {
+      throw new Error('Customer not found');
+    }
+
+    const groupName = 'group_' + foundUser.uuid;
+
+    try {
+      const paymentIntentData = {
+        amount,
+        currency,
+        customer: foundUser.stripeCustomerId,
+        payment_method: paymentMethodId,
+        confirmation_method: 'manual',
+        confirm: true,
+        off_session: true,
+        transfer_group: groupName
+      };
+
+      const paymentIntent = await stripeSDK.paymentIntents.create(paymentIntentData);
+
+      if(payees.length > 0) {
+        let accountsAndAmounts = [];
+        for(var i = 0; i < payees.length; i++) {
+          const payee = payees[i];
+	  const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
+	  accountsAndAmounts.push({
+	    account,
+	    amount: payee.amount
+	  });
+        }
+      
+        const transferPromises = accountsAndAmounts.map(accountAndAmount => {
+	  return stripeSDK.transfers.create({
+	    amount: accountAndAmount.amount,
+	    currency: 'usd',
+	    destination: accountAndAmount.account,
+	    transfer_group: groupName
+	  });
+	});
+        await Promise.all(transferPromises);
+      }
+
+      return {
+        success: true,
+        paymentIntent,
+        status: paymentIntent.status
+      };
+    } catch(err) {
+      if(err.code === 'authentication_required') {
+        return {
+          success: false,
+          requiresAuthentication: true,
+          paymentIntent: {
+            id: err.payment_intent.id,
+            client_secret: err.payment_intent.client_secret
+          }
+        };
+      }
+console.error('Error charging saved payment method', err);
+      throw err;
+    }
+  },
+
+  removeSavedPaymentMethod: async (foundUser, paymentMethodId) => {
+    try {
+      const paymentMethod = await stripeSDK.paymentMethods.detach(paymentMethodId);
+
+      return {
+        success: true
+      }
+    } catch(err) {
+console.error('error removing payment method', err);
+      throw err;
+    }
+  },
 
   payPayees: async (payees, groupName, amount) => {
 console.log('payees', payees);
@@ -270,7 +382,5 @@ console.warn(err);
     }
   }
 };
-
-
 
 export default stripe;

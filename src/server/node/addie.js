@@ -161,6 +161,7 @@ console.log('trying to get payment intent');
     const currency = body.currency;
     const nonce = body.nonce;
     const payees = body.payees;
+    const savePaymentMethod = body.savePaymentMethod;
     const signature = body.signature;
 
     const foundUser = await user.getUserByUUID(uuid);
@@ -178,9 +179,9 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees);
+      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod);
         break;
-      case 'square': paymentTokenResponse = await square.getSquarePaymentIntent(foundUser, amount, currency, payees);
+      case 'square': paymentTokenResponse = await square.getSquarePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod);
         break;
       default: throw new Error('processor not found');
     }
@@ -204,6 +205,7 @@ console.log('trying to get payment intent');
     const timestamp = body.timestamp;
     const amount = body.amount;
     const currency = body.currency;
+    const savePaymentMethod = body.savePaymentMethod;
     const signature = body.signature;
 
     const foundUser = await user.getUserByUUID(uuid);
@@ -219,7 +221,7 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntentWithoutSplits(foundUser, amount, currency);
+      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntentWithoutSplits(foundUser, amount, currency, savePaymentMethod);
         break;
       default: throw new Error('processor not found');
     }
@@ -234,6 +236,126 @@ console.log(err);
   }
 });
 
+app.get('/saved-payment-methods', async (req, res) => {
+  try {
+    const uuid = req.params.uuid;
+    const timestamp = req.params.timestamp;
+    const processor = req.params.processor;
+    const signature = req.params.signature;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    const message = timestamp + uuid;
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    switch(processor) {
+      case 'stripe': const result = await stripe.getSavedPaymentMethods(foundUser);
+        res.json(result);
+        break;
+      default: throw new Error('processor not found');
+    }
+  } catch(err) {
+console.log(err);
+    res.status(404);
+    res.send({error: err});
+  }
+});
+
+app.post('/charge-with-saved-method', async (req, res) => {
+  try {
+    const body = req.body;
+    const uuid = body.uuid;
+    const amount = body.amount;
+    const currency = body.currency;
+    const paymentMethodId = body.paymentMethodId;
+    const payees = body.payees || [];
+    
+    const foundUser = await user.getUserByUUID(uuid);
+
+    const message = timestamp + uuid + amount + paymentMethodId;
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const result = await stripe.chargeWithSavedPaymentMethod(
+      foundUser, 
+      amount, 
+      currency, 
+      paymentMethodId,
+      payees || []
+    );
+
+    res.send(result);
+  } catch(err) {
+console.error(err);
+    res.status(404);
+    res.send({error: err});
+  }
+});
+
+app.post('/payment-methods-and-intent', async (req, res) => {
+  try {
+    const body = req.body;
+    const uuid = body.uuid;
+    const amount = body.amount;
+    const currency = body.currency;
+    const paymentMethodId = body.paymentMethodId;
+    const payees = body.payees || [];
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    const message = timestamp + uuid + amount + paymentMethodId;
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const savedMethods = await stripe.getSavedPaymentMethods(foundUser);
+    const paymentIntent = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod);
+    
+    res.send({
+      savedMethods,
+      paymentIntent
+    });
+  } catch(err) {
+console.error(err);
+    res.status(404);
+    res.send({error: err});
+  }
+});
+
+app.delete('/saved-payment-methods/:paymentMethodId', async (req, res) => {
+  try {
+    const uuid = req.params.uuid;
+    const timestamp = req.params.timestamp;
+    const processor = req.params.processor;
+    const paymentMethodId = req.params.paymentMethodId;
+    const signature = req.params.signature;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    const message = timestamp + uuid;
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const result = await stripe.removeSavedPaymentMethod(foundUser, paymentMethodId);
+    res.json(result);
+  } catch (error) {
+console.error(err);
+    res.status(404);
+    res.send({error: err});
+  }
+});
 app.post('/magic/spell/:spellName', async (req, res) => {
 console.log('got spell req');
   try {
