@@ -238,10 +238,10 @@ console.log(err);
 
 app.get('/saved-payment-methods', async (req, res) => {
   try {
-    const uuid = req.params.uuid;
-    const timestamp = req.params.timestamp;
-    const processor = req.params.processor;
-    const signature = req.params.signature;
+    const uuid = req.query.uuid;
+    const timestamp = req.query.timestamp;
+    const processor = req.query.processor;
+    const signature = req.query.signature;
 
     const foundUser = await user.getUserByUUID(uuid);
 
