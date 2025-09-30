@@ -253,7 +253,7 @@ console.log('sending');
         type: type
       });
 
-      const paymentMethods = paymentMethods.data.filter(pm => {
+      const paymentMethods = allPaymentMethods.data.filter(pm => {
         return pm.allow_redisplay === 'always';
       });
 
