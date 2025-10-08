@@ -63,6 +63,93 @@ console.log('sending spell to', nextDestination);
     return body;
   },
 
+  /**
+   * signInMoney - Process payment and sign contract step
+   *
+   * Expected spell components:
+   * - contractUuid: UUID of the contract
+   * - stepId: ID of the step to sign (typically "Payment Completed")
+   * - amount: Amount in cents
+   * - processor: Payment processor (e.g., 'stripe')
+   * - paymentDetails: Payment-specific details (token, etc.)
+   */
+  signInMoney: async (spell) => {
+    try {
+      console.log('🪄 Addie resolving signInMoney spell');
+
+      const {
+        contractUuid,
+        stepId,
+        amount,
+        processor,
+        paymentDetails
+      } = spell.components;
+
+      if (!contractUuid || !stepId || !amount) {
+        return {
+          success: false,
+          error: 'Missing required spell components: contractUuid, stepId, amount'
+        };
+      }
+
+      // TODO: Process payment through Addie's payment processor
+      // For now, we'll simulate a successful payment
+      const paymentResult = {
+        success: true,
+        transactionId: `txn_${Date.now()}`,
+        amount,
+        processor: processor || 'simulated'
+      };
+
+      if (!paymentResult.success) {
+        return {
+          success: false,
+          error: 'Payment processing failed'
+        };
+      }
+
+      // Sign the contract step using Covenant
+      const COVENANT_URL = process.env.COVENANT_URL || 'http://127.0.0.1:3011/';
+      const signResponse = await fetch(`${COVENANT_URL}contract/${contractUuid}/sign`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stepId,
+          signature: spell.casterSignature,
+          timestamp: spell.timestamp,
+          userUUID: spell.casterUUID,
+          pubKey: spell.components.pubKey || spell.casterPubKey
+        })
+      });
+
+      if (!signResponse.ok) {
+        const error = await signResponse.text();
+        console.error('❌ Contract signing failed:', error);
+        return {
+          success: false,
+          error: `Contract signing failed: ${error}`
+        };
+      }
+
+      const signResult = await signResponse.json();
+
+      console.log('✅ Payment processed and contract step signed:', stepId);
+
+      return {
+        success: true,
+        payment: paymentResult,
+        contractSign: signResult
+      };
+
+    } catch (error) {
+      console.error('❌ signInMoney spell failed:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
   gatewayForSpell: async (spellName) => {
     const addie = await db.getUser('addie');
     const gateway = {
