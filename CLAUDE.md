@@ -39,11 +39,13 @@ Processes a payment and signs a Covenant contract step to record the transaction
 - `processor` - Payment processor name (e.g., 'stripe', 'simulated')
 - `paymentDetails` - Processor-specific payment details (optional)
 - `pubKey` - Public key of the payer
+- `contractSignature` - Pre-signed signature for contract authentication (message: `timestamp + userUUID + contractUUID`)
+- `stepSignature` - Pre-signed signature for step signing (message: `timestamp + userUUID + contractUUID + stepId`)
 
 **Process**:
 1. Validates required spell components
 2. Processes payment through the specified processor
-3. Signs the specified contract step via Covenant's `/contract/:uuid/sign` endpoint
+3. Signs the specified contract step via Covenant's `/contract/:uuid/sign` endpoint using pre-signed signatures
 4. Returns payment and signing results
 
 **Returns**:
@@ -71,7 +73,9 @@ Processes a payment and signs a Covenant contract step to record the transaction
 **Important Notes**:
 - Currently uses simulated payment processing (TODO: integrate real processors)
 - Requires valid spell caster signature for authentication
-- The contract step is signed using the spell's casterSignature
+- **Critical**: Spell resolvers don't have access to private keys, so spell casters must pre-sign BOTH signatures:
+  - `contractSignature` for Covenant endpoint authentication
+  - `stepSignature` for the actual contract step signing
 - Works in conjunction with Covenant's purchaseLesson spell for lesson purchases
 
 ### Other Spells
