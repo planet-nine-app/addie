@@ -363,9 +363,9 @@ console.log('got spell req');
     const spell = req.body;
 
     if(!MAGIC[spellName]) {
-console.log('sending this back'); 
+console.log('sending this back');
       res.status(404);
-      res.send({error: 'spell not found'});
+      return res.send({error: 'spell not found'});
     }
 
     let spellResp = {};
