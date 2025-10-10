@@ -109,13 +109,22 @@ console.log('sending spell to', nextDestination);
       }
 
       // Sign the contract step using Covenant
+      // Use the pre-signed contract signature from spell components
+      const contractSignature = spell.components.contractSignature;
+      if (!contractSignature) {
+        return {
+          success: false,
+          error: 'Missing required contractSignature in spell components'
+        };
+      }
+
       const COVENANT_URL = process.env.COVENANT_URL || 'http://127.0.0.1:3011/';
       const signResponse = await fetch(`${COVENANT_URL}contract/${contractUuid}/sign`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stepId,
-          signature: spell.casterSignature,
+          signature: contractSignature,
           timestamp: spell.timestamp,
           userUUID: spell.casterUUID,
           pubKey: spell.components.pubKey || spell.casterPubKey
