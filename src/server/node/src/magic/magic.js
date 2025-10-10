@@ -109,12 +109,14 @@ console.log('sending spell to', nextDestination);
       }
 
       // Sign the contract step using Covenant
-      // Use the pre-signed contract signature from spell components
+      // Use the pre-signed signatures from spell components
       const contractSignature = spell.components.contractSignature;
-      if (!contractSignature) {
+      const stepSignature = spell.components.stepSignature;
+
+      if (!contractSignature || !stepSignature) {
         return {
           success: false,
-          error: 'Missing required contractSignature in spell components'
+          error: 'Missing required contractSignature and stepSignature in spell components'
         };
       }
 
@@ -124,6 +126,7 @@ console.log('sending spell to', nextDestination);
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stepId,
+          stepSignature,
           signature: contractSignature,
           timestamp: spell.timestamp,
           userUUID: spell.casterUUID,
