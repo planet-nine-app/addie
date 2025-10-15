@@ -162,6 +162,468 @@ console.log('sending spell to', nextDestination);
     }
   },
 
+  // 🪄 MAGIC-ROUTED ENDPOINTS (No auth needed - resolver authorizes)
+
+  addieUserCreate: async (spell) => {
+    try {
+      const { pubKey } = spell.components;
+
+      if (!pubKey) {
+        return {
+          success: false,
+          error: 'Missing required field: pubKey'
+        };
+      }
+
+      const foundUser = await user.putUser({ pubKey });
+
+      return {
+        success: true,
+        user: foundUser
+      };
+    } catch (err) {
+      console.error('addieUserCreate error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieUserProcessor: async (spell) => {
+    try {
+      const { uuid, processor, country, name, email, ip } = spell.components;
+
+      if (!uuid || !processor || !name || !email) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, processor, name, email'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      let updatedUser = foundUser;
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      switch (processor) {
+        case 'stripe':
+          updatedUser = await processors.stripe.putStripeAccount(
+            foundUser,
+            country,
+            name,
+            email,
+            ip || '127.0.0.1'
+          );
+          break;
+        default:
+          return {
+            success: false,
+            error: 'Processor not found'
+          };
+      }
+
+      return {
+        success: true,
+        user: updatedUser
+      };
+    } catch (err) {
+      console.error('addieUserProcessor error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieUserProcessorIntent: async (spell) => {
+    try {
+      const {
+        uuid,
+        processor,
+        amount,
+        currency,
+        nonce,
+        payees,
+        savePaymentMethod
+      } = spell.components;
+
+      if (!uuid || !processor || !amount || !currency) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, processor, amount, currency'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      foundUser.nonce = nonce;
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      let paymentTokenResponse;
+
+      switch (processor) {
+        case 'stripe':
+          paymentTokenResponse = await processors.stripe.getStripePaymentIntent(
+            foundUser,
+            amount,
+            currency,
+            payees,
+            savePaymentMethod
+          );
+          break;
+        case 'square':
+          paymentTokenResponse = await processors.square.getSquarePaymentIntent(
+            foundUser,
+            amount,
+            currency,
+            payees,
+            savePaymentMethod
+          );
+          break;
+        default:
+          return {
+            success: false,
+            error: 'Processor not found'
+          };
+      }
+
+      return {
+        success: true,
+        paymentIntent: paymentTokenResponse
+      };
+    } catch (err) {
+      console.error('addieUserProcessorIntent error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieUserProcessorIntentWithoutSplits: async (spell) => {
+    try {
+      const {
+        uuid,
+        processor,
+        amount,
+        currency,
+        savePaymentMethod
+      } = spell.components;
+
+      if (!uuid || !processor || !amount || !currency) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, processor, amount, currency'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      let paymentTokenResponse;
+
+      switch (processor) {
+        case 'stripe':
+          paymentTokenResponse = await processors.stripe.getStripePaymentIntentWithoutSplits(
+            foundUser,
+            amount,
+            currency,
+            savePaymentMethod
+          );
+          break;
+        default:
+          return {
+            success: false,
+            error: 'Processor not found'
+          };
+      }
+
+      return {
+        success: true,
+        paymentIntent: paymentTokenResponse
+      };
+    } catch (err) {
+      console.error('addieUserProcessorIntentWithoutSplits error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieChargeSavedMethod: async (spell) => {
+    try {
+      const {
+        uuid,
+        amount,
+        currency,
+        paymentMethodId,
+        payees
+      } = spell.components;
+
+      if (!uuid || !amount || !paymentMethodId) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, amount, paymentMethodId'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      const result = await processors.stripe.chargeWithSavedPaymentMethod(
+        foundUser,
+        amount,
+        currency,
+        paymentMethodId,
+        payees || []
+      );
+
+      return {
+        success: true,
+        result
+      };
+    } catch (err) {
+      console.error('addieChargeSavedMethod error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addiePaymentMethodsIntent: async (spell) => {
+    try {
+      const {
+        uuid,
+        amount,
+        currency,
+        payees,
+        savePaymentMethod
+      } = spell.components;
+
+      if (!uuid || !amount || !currency) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, amount, currency'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      const savedMethods = await processors.stripe.getSavedPaymentMethods(foundUser);
+      const paymentIntent = await processors.stripe.getStripePaymentIntent(
+        foundUser,
+        amount,
+        currency,
+        payees,
+        savePaymentMethod
+      );
+
+      return {
+        success: true,
+        savedMethods,
+        paymentIntent
+      };
+    } catch (err) {
+      console.error('addiePaymentMethodsIntent error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieSavedPaymentMethodDelete: async (spell) => {
+    try {
+      const { uuid, paymentMethodId } = spell.components;
+
+      if (!uuid || !paymentMethodId) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, paymentMethodId'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      const result = await processors.stripe.removeSavedPaymentMethod(foundUser, paymentMethodId);
+
+      return {
+        success: true,
+        result
+      };
+    } catch (err) {
+      console.error('addieSavedPaymentMethodDelete error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieMoneyProcessor: async (spell) => {
+    try {
+      const {
+        uuid,
+        processor,
+        caster,
+        spellData,
+        gatewayUsers
+      } = spell.components;
+
+      if (!uuid || !processor || !caster || !spellData) {
+        return {
+          success: false,
+          error: 'Missing required fields: uuid, processor, caster, spellData'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      const addieCaster = await user.getUserByPublicKey(caster.pubKey);
+      if (!addieCaster) {
+        return {
+          success: false,
+          error: 'Caster not found'
+        };
+      }
+
+      if (!addieCaster[processor] || addieCaster[processor].stored < spellData.totalCost) {
+        return {
+          success: false,
+          error: 'Insufficient funds'
+        };
+      }
+
+      let payees = spellData.gateways.map(payee => {
+        const gatewayUser = gatewayUsers.find($ => $.uuid === payee.uuid);
+        if (gatewayUser) {
+          payee.pubKey = gatewayUser.pubKey;
+        }
+        return payee;
+      });
+
+      const groupName = 'group_' + addieCaster.uuid;
+
+      const processorsModule = await import('../processors/processors.js');
+      const processors = processorsModule.default;
+
+      let paidOutResult;
+
+      switch (processor) {
+        case 'stripe':
+          paidOutResult = await processors.stripe.payPayees(payees, groupName, spellData.totalCost);
+          break;
+        default:
+          return {
+            success: false,
+            error: 'Processor not found'
+          };
+      }
+
+      return {
+        success: paidOutResult
+      };
+    } catch (err) {
+      console.error('addieMoneyProcessor error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  addieUserDelete: async (spell) => {
+    try {
+      const { uuid } = spell.components;
+
+      if (!uuid) {
+        return {
+          success: false,
+          error: 'Missing required field: uuid'
+        };
+      }
+
+      const foundUser = await user.getUserByUUID(uuid);
+      if (!foundUser) {
+        return {
+          success: false,
+          error: 'User not found'
+        };
+      }
+
+      const result = await user.deleteUser(foundUser);
+
+      return {
+        success: result
+      };
+    } catch (err) {
+      console.error('addieUserDelete error:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
   gatewayForSpell: async (spellName) => {
     const addie = await db.getUser('addie');
     const gateway = {

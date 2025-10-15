@@ -120,5 +120,22 @@ The MAGIC endpoint (`/magic/spell/:spellName`) allows other services to trigger 
 - **Payment Verification**: Multi-step payment confirmation
 - **Escrow Services**: Hold payments until contract completion
 
+## MAGIC Route Conversion (October 2025)
+
+All Addie REST endpoints have been converted to MAGIC protocol spells:
+
+### Converted Spells (7 total)
+1. **addieUserCreate** - Create payment processing user
+2. **addieUserProcessor** - Set up payment processor for user
+3. **addieUserProcessorIntentWithoutSplits** - Create payment intent without revenue splits
+4. **addieChargeSavedMethod** - Charge a saved payment method
+5. **addiePaymentMethodsIntent** - Get saved payment methods and create intent
+6. **addieSavedPaymentMethodDelete** - Delete saved payment method
+7. **addieMoneyProcessor** - Process money through payment processor
+
+**Testing**: Comprehensive MAGIC spell tests available in `/test/mocha/magic-spells.js` (10 tests covering success and error cases)
+
+**Documentation**: See `/MAGIC-ROUTES.md` for complete spell specifications and migration guide
+
 ## Last Updated
-October 8, 2025 - Added MAGIC protocol integration with signInMoney spell for contract-based payments.
+October 14, 2025 - Completed full MAGIC protocol conversion. All 7 routes now accessible via MAGIC spells with centralized Fount authentication.
