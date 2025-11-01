@@ -18,12 +18,11 @@ Addie is a Planet Nine allyabase microservice that handles payment processing an
 
 ### Payment Operations
 - `POST /payment` - Process a payment transaction
-- `POST /payment/:paymentIntentId/process-transfers` - Process transfers to Connected Accounts after payment
+- `POST /payment/:paymentIntentId/process-transfers` - Process instant transfers to payout cards after payment
 
-### Stripe Connected Accounts (October 2025)
-- `POST /processor/stripe/create-account` - Create Stripe Express Connected Account
-- `GET /processor/stripe/account/status` - Get Connected Account status
-- `POST /processor/stripe/account/refresh-link` - Refresh onboarding link
+### Stripe Payout Cards (November 2025)
+- `POST /payout-card/save` - Save debit card for receiving affiliate payouts
+- `GET /payout-card/status` - Get payout card status
 
 ### Stripe Payment Methods
 - `POST /processor/stripe/setup-intent` - Create SetupIntent for saving cards
@@ -159,45 +158,43 @@ All Addie REST endpoints have been converted to MAGIC protocol spells:
 
 **Documentation**: See `/MAGIC-ROUTES.md` for complete spell specifications and migration guide
 
-## Stripe Connected Accounts Integration (October 2025)
+## Stripe Payout Cards Integration (November 2025)
 
 ### Overview
 
-Addie provides complete Stripe Connected Account management for The Advancement iOS and Android apps, enabling users to receive affiliate commissions and product sales revenue. This is critical for the affiliate marketplace flow where sellers need to receive payments.
+Addie provides direct debit card payout functionality for The Advancement iOS and Android apps, enabling users to receive instant affiliate commissions (30 minutes) without complex KYC onboarding. This replaces the previous Connected Accounts approach with a simpler, faster payout method.
 
 ### Architecture
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │  The Advancement App                                   │
-│  - Creates connected account                           │
-│  - Checks account status                               │
-│  - Refreshes onboarding links                          │
+│  - Selects debit card for payouts                      │
+│  - Checks payout card status                           │
 └───────────────────┬────────────────────────────────────┘
                     │ Sessionless Auth
                     ▼
 ┌────────────────────────────────────────────────────────┐
 │  Addie Backend                                         │
-│  /processor/stripe/create-account                      │
-│  /processor/stripe/account/status                      │
-│  /processor/stripe/account/refresh-link                │
+│  /payout-card/save                                     │
+│  /payout-card/status                                   │
 │  /payment/:id/process-transfers                        │
 └───────────────────┬────────────────────────────────────┘
                     │ Stripe API
                     ▼
 ┌────────────────────────────────────────────────────────┐
 │  Stripe Platform                                       │
-│  - Express Connected Accounts                          │
-│  - Onboarding flows                                    │
-│  - Transfer capabilities                               │
+│  - Direct Debit Card Transfers                         │
+│  - Instant Payouts (~30 minutes)                       │
+│  - Works with Stripe Issued Cards                      │
 └────────────────────────────────────────────────────────┘
 ```
 
 ### Endpoints
 
-#### POST /processor/stripe/create-account
+#### POST /payout-card/save
 
-Creates a Stripe Express Connected Account for receiving payments.
+Saves a debit card payment method as the user's payout destination for receiving affiliate commissions.
 
 **Request**:
 ```json
@@ -205,82 +202,77 @@ Creates a Stripe Express Connected Account for receiving payments.
   "timestamp": "1234567890",
   "pubKey": "02a1b2c3...",
   "signature": "3045022100...",
-  "accountType": "express",
-  "country": "US",
-  "email": "user@example.com",
-  "businessType": "individual"
+  "paymentMethodId": "pm_1AbCdEfGhIjKlMn"
 }
 ```
 
-**Response**:
+**Response (Success)**:
 ```json
 {
-  "accountId": "acct_1AbCdEfGhIjKlMn",
-  "accountLink": "https://connect.stripe.com/setup/s/abc123..."
+  "success": true,
+  "payoutCardId": "pm_1AbCdEfGhIjKlMn",
+  "last4": "4242",
+  "brand": "visa",
+  "expMonth": 12,
+  "expYear": 2025
 }
 ```
 
-**Implementation** (`src/server/node/src/processors/stripe.js`):
-- Creates Stripe Express account with transfer capabilities
-- Generates account link for onboarding
-- Stores accountId in Addie user record
-- Returns onboarding URL for KYC completion
-
-#### GET /processor/stripe/account/status
-
-Retrieves the status of a user's Connected Account.
-
-**Request Headers**:
-```
-X-Timestamp: 1234567890
-X-PublicKey: 02a1b2c3...
-X-Signature: 3045022100...
-```
-
-**Response**:
+**Response (Error - Not Debit Card)**:
 ```json
 {
-  "hasAccount": true,
-  "accountId": "acct_1AbCdEfGhIjKlMn",
-  "detailsSubmitted": true,
-  "chargesEnabled": true,
-  "payoutsEnabled": true
+  "success": false,
+  "error": "Only debit cards can be used as payout destinations"
 }
 ```
 
-**Implementation**:
-- Retrieves accountId from user record
-- Fetches account details from Stripe
-- Returns onboarding and capability status
+**Implementation** (`src/server/node/src/processors/stripe.js:681-717`):
+- Validates payment method is a debit card (or issued card)
+- Saves payment method ID to user record as `stripePayoutCardId`
+- Returns card details for confirmation
 
-#### POST /processor/stripe/account/refresh-link
+**Signature**: `timestamp + pubKey + paymentMethodId`
 
-Generates a fresh onboarding link for an existing account.
+#### GET /payout-card/status
 
-**Request**:
+Retrieves the user's current payout card status and details.
+
+**Request (Query Parameters)**:
+```
+?timestamp=1234567890&pubKey=02a1b2c3...&signature=3045022100...
+```
+
+**Response (Has Payout Card)**:
 ```json
 {
-  "timestamp": "1234567890",
-  "pubKey": "02a1b2c3...",
-  "signature": "3045022100..."
+  "success": true,
+  "hasPayoutCard": true,
+  "payoutCardId": "pm_1AbCdEfGhIjKlMn",
+  "last4": "4242",
+  "brand": "visa",
+  "expMonth": 12,
+  "expYear": 2025
 }
 ```
 
-**Response**:
+**Response (No Payout Card)**:
 ```json
 {
-  "accountLink": "https://connect.stripe.com/setup/s/xyz789..."
+  "success": true,
+  "hasPayoutCard": false
 }
 ```
 
-**Implementation**:
-- Uses stored accountId from user record
-- Creates new account link with Stripe
-- Returns fresh onboarding URL
+**Implementation** (`src/server/node/src/processors/stripe.js:724-751`):
+- Checks user record for `stripePayoutCardId`
+- Fetches payment method details from Stripe if exists
+- Returns card information
+
+**Signature**: `timestamp + pubKey`
 
 #### POST /payment/:paymentIntentId/process-transfers
 
-Processes transfers to Connected Accounts after payment confirmation.
+Processes instant transfers to payout cards after payment confirmation.
 
 **Request**:
 ```json
@@ -300,13 +292,13 @@ Processes transfers to Connected Accounts after payment confirmation.
       "pubKey": "02a1b2c3...",
       "amount": 500,
       "transferId": "tr_1AbCdEfGhIjKlMn",
-      "destination": "acct_affiliate"
+      "destination": "pm_card_visa_debit"
     },
     {
       "pubKey": "02d4e5f6...",
       "amount": 4500,
       "transferId": "tr_2XyZaBcDeFgHiJk",
-      "destination": "acct_creator"
+      "destination": "pm_card_mastercard_debit"
     }
   ],
   "paymentIntentId": "pi_1AbCdEfGhIjKlMn",
@@ -315,12 +307,12 @@ Processes transfers to Connected Accounts after payment confirmation.
 }
 ```
 
-**Implementation** (`src/server/node/src/processors/stripe.js:680-774`):
+**Implementation** (`src/server/node/src/processors/stripe.js:801-834`):
 1. Retrieves payment intent by ID
 2. Checks payment status is `succeeded`
 3. Reads payee metadata from payment intent
-4. Looks up each payee's Connected Account
-5. Creates Stripe transfers to each account
+4. Looks up each payee's saved payout card (`stripePayoutCardId`)
+5. Creates direct Stripe transfers to debit cards (instant payout)
 6. Returns transfer results
 
 **Metadata Format** (stored in payment intent):
@@ -340,14 +332,14 @@ Processes transfers to Connected Accounts after payment confirmation.
 
 1. **Setup Phase**:
 ```
-Bob creates Connected Account
-→ POST /processor/stripe/create-account
-→ Bob completes Stripe onboarding (KYC)
-→ detailsSubmitted: true, payoutsEnabled: true
+Bob saves payout card (debit card or issued card)
+→ POST /payout-card/save with paymentMethodId
+→ Instant setup, no KYC required
+→ Can use external debit card or Planet Nine issued card
 
-Carl creates Connected Account
+Carl saves payout card
 → Same process
-→ Both can now receive payments
+→ Both can now receive instant payouts
 ```
 
 2. **Purchase Phase**:
@@ -371,22 +363,22 @@ Payment intent created with metadata:
 Alice confirms payment via Stripe
 → Payment status: succeeded
 → POST /payment/pi_xxx/process-transfers
-→ Transfer $5 to Bob's Connected Account
-→ Transfer $45 to Carl's Connected Account
-→ Funds arrive in 2-3 business days
+→ Direct transfer $5 to Bob's payout card
+→ Direct transfer $45 to Carl's payout card
+→ Funds arrive in ~30 minutes (instant payout)
 ```
 
 ### Storage
 
-Connected Account IDs are stored in Addie user records:
+Payout card IDs are stored in Addie user records:
 
 ```javascript
 {
   uuid: "user-uuid",
   pubKey: "02a1b2c3...",
-  stripeCustomerId: "cus_...",     // For making purchases
-  stripeAccountId: "acct_...",     // For receiving payments
-  stripeCardholderId: "ich_..."    // For virtual cards
+  stripeCustomerId: "cus_...",      // For making purchases
+  stripePayoutCardId: "pm_...",     // For receiving payouts (debit card)
+  stripeCardholderId: "ich_..."     // For virtual cards
 }
 ```
 
@@ -400,13 +392,12 @@ npm run test:the-advancement
 ```
 
 **Test Coverage**:
-- ✅ Create Connected Accounts (Express accounts)
-- ✅ Generate onboarding links
-- ✅ Check account status
-- ✅ Refresh onboarding links
+- ✅ Check payout card status
+- ✅ Save debit cards as payout destinations
+- ✅ Validate debit-only restriction
 - ✅ Create payment intents with splits
-- ✅ Process transfers to Connected Accounts
-- ✅ Handle missing/invalid accounts gracefully
+- ✅ Process instant transfers to payout cards
+- ✅ Handle missing payout cards gracefully
 
 See `/sharon/tests/the-advancement/README.md` for complete documentation.
 
@@ -415,25 +406,37 @@ See `/sharon/tests/the-advancement/README.md` for complete documentation.
 The Advancement iOS and Android apps use these endpoints for:
 
 **iOS** (`PaymentMethodViewController.swift`):
-- `createConnectedAccount()` - Creates Express account
-- `getConnectedAccountStatus()` - Checks account status
-- `refreshAccountLink()` - Refreshes onboarding
+- `savePayoutCard()` - Saves debit card for payouts
+- `getPayoutCardStatus()` - Checks payout card status
 
 **Android** (`PaymentMethodActivity.kt`):
-- Same three methods with Kotlin coroutines
-- SharedPreferences for account ID storage
+- Same two methods with Kotlin coroutines
+- SharedPreferences for payout card ID storage
 
-Both apps provide a "Receive Payments" tab with three-state UI:
-1. **Not Setup**: Button to create account
-2. **Pending**: Button to continue onboarding
-3. **Active**: Account details with status indicators
+Both apps provide a "Receive Payments" tab with two-state UI:
+1. **Not Setup**: List of available debit cards with "Use for Payouts" buttons
+2. **Setup**: Payout card details with instant payout messaging
 
 ### Security
 
 - **Sessionless Authentication**: All requests require cryptographic signatures
-- **Account Ownership**: Account IDs linked to user's public key
-- **Transfer Validation**: Only transfers to verified Connected Accounts
-- **Metadata Security**: Payee data encrypted in payment intent metadata
+- **Card Ownership**: Payout card IDs linked to user's public key
+- **Debit-Only Validation**: Only debit cards accepted as payout destinations
+- **Transfer Validation**: Only transfers to verified payout cards
+- **Metadata Security**: Payee data stored in payment intent metadata
+
+### Benefits over Connected Accounts
+
+1. **Instant Setup**: No KYC onboarding required
+2. **Faster Payouts**: ~30 minutes vs 2-3 business days
+3. **Works with Issued Cards**: Planet Nine virtual cards can receive payouts
+4. **Simpler UX**: 2-state UI vs 3-state (not setup/pending/active)
+5. **Lower Barrier**: Unbanked users with issued cards can receive payouts immediately
+
+### Trade-offs
+
+- **Higher Fees**: 1.5% per payout vs 0.25% for Connected Accounts
+- **US-Only**: Direct debit card transfers only work in the US (acceptable for beta)
 
 ## Last Updated
-October 31, 2025 - Added complete Stripe Connected Accounts integration with transfer processing for affiliate marketplace. All endpoints tested via Sharon test suite. Ready for production deployment.
+November 1, 2025 - Converted from Stripe Connected Accounts to direct debit card payouts for instant affiliate commissions. All endpoints tested via Sharon test suite. Ready for production deployment.

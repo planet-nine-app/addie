@@ -672,6 +672,85 @@ console.warn(err);
   },
 
   /**
+   * Save a debit card as payout destination (for receiving affiliate commissions)
+   * Works with both external debit cards AND issued cards
+   * @param {Object} foundUser - User object
+   * @param {string} paymentMethodId - Stripe payment method ID (card token)
+   * @returns {Object} Result with saved card details
+   */
+  savePayoutCard: async (foundUser, paymentMethodId) => {
+    try {
+      console.log(`💳 Saving payout card for user: ${foundUser.pubKey?.substring(0, 10)}...`);
+
+      // Retrieve the payment method to validate it's a debit card
+      const paymentMethod = await stripeSDK.paymentMethods.retrieve(paymentMethodId);
+
+      // Check if it's a debit card (or issued card)
+      if(paymentMethod.card.funding !== 'debit' && !paymentMethod.card.issuer) {
+        return {
+          success: false,
+          error: 'Only debit cards can be used as payout destinations'
+        };
+      }
+
+      // Save the payment method ID to user record
+      foundUser.stripePayoutCardId = paymentMethodId;
+      await user.saveUser(foundUser);
+
+      console.log(`✅ Payout card saved: ${paymentMethod.card.brand} ending in ${paymentMethod.card.last4}`);
+
+      return {
+        success: true,
+        payoutCardId: paymentMethodId,
+        last4: paymentMethod.card.last4,
+        brand: paymentMethod.card.brand,
+        expMonth: paymentMethod.card.exp_month,
+        expYear: paymentMethod.card.exp_year
+      };
+    } catch(err) {
+      console.error('❌ Error saving payout card:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  /**
+   * Get saved payout card details
+   * @param {Object} foundUser - User object
+   * @returns {Object} Payout card details or null
+   */
+  getPayoutCard: async (foundUser) => {
+    try {
+      if(!foundUser.stripePayoutCardId) {
+        return {
+          success: true,
+          hasPayoutCard: false
+        };
+      }
+
+      const paymentMethod = await stripeSDK.paymentMethods.retrieve(foundUser.stripePayoutCardId);
+
+      return {
+        success: true,
+        hasPayoutCard: true,
+        payoutCardId: foundUser.stripePayoutCardId,
+        last4: paymentMethod.card.last4,
+        brand: paymentMethod.card.brand,
+        expMonth: paymentMethod.card.exp_month,
+        expYear: paymentMethod.card.exp_year
+      };
+    } catch(err) {
+      console.error('❌ Error getting payout card:', err);
+      return {
+        success: false,
+        error: err.message
+      };
+    }
+  },
+
+  /**
    * Process transfers after payment confirmation
    * Called from webhook or client-side after payment succeeds
    * @param {string} paymentIntentId - Stripe payment intent ID
@@ -720,31 +799,31 @@ console.warn(err);
         }
 
         try {
-          // Look up payee's Stripe account
+          // Look up payee's saved payout card
           const payeeUser = await user.getUserByPublicKey(pubKey);
-          if(!payeeUser.stripeAccountId) {
-            console.warn(`⚠️ Payee ${pubKey} does not have a Stripe account, skipping transfer`);
+          if(!payeeUser.stripePayoutCardId) {
+            console.warn(`⚠️ Payee ${pubKey} does not have a payout card saved, skipping transfer`);
             continue;
           }
 
-          // Create transfer
+          // Create direct transfer to debit card (instant payout)
           console.log(`💸 Transferring ${amount} cents to ${pubKey.substring(0, 10)}...`);
           const transfer = await stripeSDK.transfers.create({
             amount: amount,
             currency: 'usd',
-            destination: payeeUser.stripeAccountId,
+            destination: payeeUser.stripePayoutCardId,
             transfer_group: transferGroup,
-            description: `Payment from ${paymentIntentId}`
+            description: `Affiliate payout from ${paymentIntentId}`
           });
 
           transfers.push({
             pubKey: pubKey,
             amount: amount,
             transferId: transfer.id,
-            destination: payeeUser.stripeAccountId
+            destination: payeeUser.stripePayoutCardId
           });
 
-          console.log(`✅ Transfer created: ${transfer.id}`);
+          console.log(`✅ Instant payout created: ${transfer.id}`);
         } catch(err) {
           console.error(`❌ Failed to transfer to ${pubKey}:`, err.message);
           transfers.push({

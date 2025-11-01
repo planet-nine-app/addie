@@ -669,6 +669,71 @@ console.error('Error getting transactions:', err);
   }
 });
 
+// Payout Card Endpoints (for receiving affiliate commissions)
+
+app.post('/payout-card/save', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const paymentMethodId = body.paymentMethodId;
+
+    const message = timestamp + pubKey + paymentMethodId;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    let foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      foundUser = await user.putUser({ pubKey });
+    }
+
+    const result = await stripe.savePayoutCard(foundUser, paymentMethodId);
+
+console.log('Payout card saved:', result);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error saving payout card:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to save payout card'});
+  }
+});
+
+app.get('/payout-card/status', async (req, res) => {
+  try {
+    const timestamp = req.query.timestamp;
+    const pubKey = req.query.pubKey;
+    const signature = req.query.signature;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.getPayoutCard(foundUser);
+
+console.log('Payout card status:', result);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error checking payout card status:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to check payout card status'});
+  }
+});
+
 app.post('/payment/:paymentIntentId/process-transfers', async (req, res) => {
   try {
     const paymentIntentId = req.params.paymentIntentId;
