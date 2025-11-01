@@ -356,6 +356,340 @@ console.error(err);
     res.send({error: err});
   }
 });
+
+app.post('/processor/:processor/setup-intent', async (req, res) => {
+  try {
+    const processor = req.params.processor;
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const customerId = body.customerId;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+
+    // Message for authentication
+    const message = timestamp + (pubKey || '');
+
+    let foundUser;
+
+    // If pubKey provided, authenticate
+    if(pubKey) {
+      if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+        res.status(403);
+        return res.send({error: 'Auth error'});
+      }
+
+      foundUser = await user.getUserByPublicKey(pubKey);
+      if(!foundUser) {
+        // Create user if doesn't exist
+        foundUser = await user.putUser({ pubKey });
+      }
+    } else {
+      // For unauthenticated setup intents (anonymous users)
+      // Create a temporary user record
+      foundUser = { stripeCustomerId: customerId };
+    }
+
+    let setupIntentResponse;
+
+    switch(processor) {
+      case 'stripe':
+        setupIntentResponse = await stripe.createSetupIntent(foundUser, customerId);
+        break;
+      default:
+        throw new Error('processor not found');
+    }
+
+console.log('SetupIntent created:', setupIntentResponse.clientSecret);
+
+    res.send(setupIntentResponse);
+  } catch(err) {
+console.error('Error creating SetupIntent:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to create SetupIntent'});
+  }
+});
+
+// Card Issuing Endpoints
+
+app.post('/issuing/cardholder', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const individualInfo = body.individualInfo;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    let foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      foundUser = await user.putUser({ pubKey });
+    }
+
+    const result = await stripe.createCardholder(foundUser, individualInfo);
+
+console.log('Cardholder created:', result.cardholderId);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error creating cardholder:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to create cardholder'});
+  }
+});
+
+app.get('/issuing/cardholder/status', async (req, res) => {
+  try {
+    const timestamp = req.query.timestamp;
+    const pubKey = req.query.pubKey;
+    const signature = req.query.signature;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const hasCardholder = !!foundUser.stripeCardholderId;
+
+console.log('Cardholder status:', hasCardholder);
+
+    res.send({ hasCardholder });
+  } catch(err) {
+console.error('Error checking cardholder status:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to check cardholder status'});
+  }
+});
+
+app.post('/issuing/card/virtual', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const currency = body.currency || 'usd';
+    const spendingLimit = body.spendingLimit;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.issueVirtualCard(foundUser, currency, spendingLimit);
+
+console.log('Virtual card issued:', result.cardId);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error issuing virtual card:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to issue virtual card'});
+  }
+});
+
+app.post('/issuing/card/physical', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const shippingAddress = body.shippingAddress;
+    const currency = body.currency || 'usd';
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.issuePhysicalCard(foundUser, shippingAddress, currency);
+
+console.log('Physical card issued:', result.cardId);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error issuing physical card:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to issue physical card'});
+  }
+});
+
+app.get('/issuing/cards', async (req, res) => {
+  try {
+    const timestamp = req.query.timestamp;
+    const pubKey = req.query.pubKey;
+    const signature = req.query.signature;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.getIssuedCards(foundUser);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error getting issued cards:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to get issued cards'});
+  }
+});
+
+app.get('/issuing/card/:cardId/details', async (req, res) => {
+  try {
+    const cardId = req.params.cardId;
+    const timestamp = req.query.timestamp;
+    const pubKey = req.query.pubKey;
+    const signature = req.query.signature;
+
+    const message = timestamp + pubKey + cardId;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.getVirtualCardDetails(foundUser, cardId);
+
+console.log('Retrieved virtual card details:', cardId);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error getting card details:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to get card details'});
+  }
+});
+
+app.patch('/issuing/card/:cardId/status', async (req, res) => {
+  try {
+    const cardId = req.params.cardId;
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const status = body.status;
+
+    const message = timestamp + pubKey + cardId + status;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.updateCardStatus(foundUser, cardId, status);
+
+console.log('Updated card status:', cardId, status);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error updating card status:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to update card status'});
+  }
+});
+
+app.get('/issuing/transactions', async (req, res) => {
+  try {
+    const timestamp = req.query.timestamp;
+    const pubKey = req.query.pubKey;
+    const signature = req.query.signature;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    const foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    const result = await stripe.getTransactions(foundUser, limit);
+
+console.log('Retrieved transactions:', result.transactions.length);
+
+    res.send(result);
+  } catch(err) {
+console.error('Error getting transactions:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to get transactions'});
+  }
+});
+
+app.post('/payment/:paymentIntentId/process-transfers', async (req, res) => {
+  try {
+    const paymentIntentId = req.params.paymentIntentId;
+
+    console.log(`📡 Received request to process transfers for payment: ${paymentIntentId}`);
+
+    const result = await stripe.processPaymentTransfers(paymentIntentId);
+
+    if(result.success) {
+      res.send(result);
+    } else {
+      res.status(400);
+      res.send(result);
+    }
+  } catch(err) {
+    console.error('❌ Error in process-transfers endpoint:', err);
+    res.status(500);
+    res.send({error: err.message || 'Failed to process transfers'});
+  }
+});
+
 app.post('/magic/spell/:spellName', async (req, res) => {
 console.log('got spell req');
   try {
