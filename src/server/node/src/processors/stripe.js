@@ -64,7 +64,7 @@ const stripe = {
     return foundUser;
   },
 
-  getStripePaymentIntent: async (foundUser, amount, currency, payees, savePaymentMethod = false) => {
+  getStripePaymentIntent: async (foundUser, amount, currency, payees, savePaymentMethod = false, productInfo = {}) => {
     const customerId = foundUser.stripeCustomerId || (await stripeSDK.customers.create()).id;
     if(foundUser.stripeCustomerId !== customerId) {
       foundUser.stripeCustomerId = customerId;
@@ -100,15 +100,39 @@ const stripe = {
       payeeMetadata.payee_count = Object.keys(payeeMetadata).filter(k => k.endsWith('_pubkey')).length.toString();
     }
 
+    // Add product information to metadata (if provided)
+    if(productInfo.productName) {
+      payeeMetadata.product_name = productInfo.productName;
+    }
+    if(productInfo.productId) {
+      payeeMetadata.product_id = productInfo.productId;
+    }
+    if(productInfo.contractUuid) {
+      payeeMetadata.contract_uuid = productInfo.contractUuid;
+    }
+    if(productInfo.emojicode) {
+      payeeMetadata.emojicode = productInfo.emojicode;
+    }
+
+    // Build description for Stripe Dashboard (most visible field)
+    let description = 'Product purchase';
+    if(productInfo.productName) {
+      description = `Purchase: ${productInfo.productName}`;
+      if(payeeMetadata.payee_count > 1) {
+        description += ' (with affiliate commission)';
+      }
+    }
+
     const paymentIntentData = {
       amount: amount,
       currency: currency,
       customer: customerId,
+      description: description, // Shows prominently in Stripe Dashboard
       automatic_payment_methods: {
 	enabled: true,
       },
       transfer_group: groupName,
-      metadata: payeeMetadata // Store payee info for post-payment processing
+      metadata: payeeMetadata // Store payee info + product info for post-payment processing
     };
 
     if(savePaymentMethod) {
@@ -118,6 +142,7 @@ const stripe = {
     const paymentIntent = await stripeSDK.paymentIntents.create(paymentIntentData);
 
     console.log(`✅ Payment intent created: ${paymentIntent.id}`);
+    console.log(`📦 Product: ${productInfo.productName || 'Unknown'}`);
     console.log(`💰 Payee metadata stored for ${payeeMetadata.payee_count || 0} payees`);
     console.log(`⏳ Transfers will be created after payment confirmation`);
 
@@ -806,6 +831,30 @@ console.warn(err);
             continue;
           }
 
+          // Build transfer description with product info
+          const productName = metadata.product_name || 'Product';
+          const commissionType = i === 0 ? 'Affiliate' : 'Creator';
+          const transferDescription = `${productName} - ${commissionType} payout`;
+
+          // Build transfer metadata with product + commission info
+          const transferMetadata = {
+            product_name: metadata.product_name || 'Unknown product',
+            commission_type: commissionType.toLowerCase(),
+            payee_pubkey: pubKey.substring(0, 20), // Truncate for metadata limit
+            original_payment_intent: paymentIntentId
+          };
+
+          // Add optional metadata fields if present
+          if(metadata.product_id) {
+            transferMetadata.product_id = metadata.product_id;
+          }
+          if(metadata.contract_uuid) {
+            transferMetadata.contract_uuid = metadata.contract_uuid;
+          }
+          if(metadata.emojicode) {
+            transferMetadata.emojicode = metadata.emojicode;
+          }
+
           // Create direct transfer to debit card (instant payout)
           console.log(`💸 Transferring ${amount} cents to ${pubKey.substring(0, 10)}...`);
           const transfer = await stripeSDK.transfers.create({
@@ -813,7 +862,8 @@ console.warn(err);
             currency: 'usd',
             destination: payeeUser.stripePayoutCardId,
             transfer_group: transferGroup,
-            description: `Affiliate payout from ${paymentIntentId}`
+            description: transferDescription,
+            metadata: transferMetadata
           });
 
           transfers.push({
@@ -823,7 +873,7 @@ console.warn(err);
             destination: payeeUser.stripePayoutCardId
           });
 
-          console.log(`✅ Instant payout created: ${transfer.id}`);
+          console.log(`✅ Instant payout created: ${transfer.id} (${transferDescription})`);
         } catch(err) {
           console.error(`❌ Failed to transfer to ${pubKey}:`, err.message);
           transfers.push({

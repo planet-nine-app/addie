@@ -438,5 +438,131 @@ Both apps provide a "Receive Payments" tab with two-state UI:
 - **Higher Fees**: 1.5% per payout vs 0.25% for Connected Accounts
 - **US-Only**: Direct debit card transfers only work in the US (acceptable for beta)
 
+## Product Metadata in Stripe Dashboard (November 2025)
+
+### Overview
+
+All payment intents and transfers now include product metadata that appears in the Stripe Dashboard, making it easy to identify which products generated revenue and track affiliate commissions.
+
+### What Shows Up in Stripe
+
+**Payment Intent**:
+- **Description** (most visible): "Purchase: Advanced React Course (with affiliate commission)"
+- **Metadata**:
+  - `product_name`: "Advanced React Course"
+  - `product_id`: "prod_abc123" (optional)
+  - `contract_uuid`: "uuid-..." (optional)
+  - `emojicode`: "🌍🔑💎🌟💎🎨🐉📌" (optional)
+  - `payee_count`: "2"
+  - `payee_0_pubkey`: "02a1b2c3..."
+  - `payee_0_amount`: "500"
+  - `payee_1_pubkey`: "02d4e5f6..."
+  - `payee_1_amount`: "4500"
+
+**Transfer** (to payout cards):
+- **Description**: "Advanced React Course - Affiliate payout"
+- **Metadata**:
+  - `product_name`: "Advanced React Course"
+  - `commission_type`: "affiliate" or "creator"
+  - `payee_pubkey`: "02a1b2c3..." (truncated to 20 chars)
+  - `original_payment_intent`: "pi_abc123"
+  - `product_id`: "prod_abc123" (if provided)
+  - `contract_uuid`: "uuid-..." (if provided)
+  - `emojicode`: "🌍🔑💎..." (if provided)
+
+### API Usage
+
+When creating a payment intent, include product information in the request body:
+
+```javascript
+POST /user/:uuid/processor/stripe/intent
+
+{
+  "timestamp": "1234567890",
+  "amount": 5000,
+  "currency": "usd",
+  "payees": [
+    { "pubKey": "02a1b2c3...", "amount": 500 },   // Affiliate
+    { "pubKey": "02d4e5f6...", "amount": 4500 }   // Creator
+  ],
+  "signature": "...",
+
+  // Product metadata (all optional)
+  "productName": "Advanced React Course",
+  "productId": "prod_abc123",
+  "contractUuid": "uuid-...",
+  "emojicode": "🌍🔑💎🌟💎🎨🐉📌"
+}
+```
+
+### Implementation Details
+
+**stripe.js** (`getStripePaymentIntent` function):
+```javascript
+// Accepts optional productInfo parameter
+getStripePaymentIntent: async (foundUser, amount, currency, payees, savePaymentMethod = false, productInfo = {}) => {
+  // Build description for dashboard
+  let description = 'Product purchase';
+  if(productInfo.productName) {
+    description = `Purchase: ${productInfo.productName}`;
+    if(payeeMetadata.payee_count > 1) {
+      description += ' (with affiliate commission)';
+    }
+  }
+
+  // Add product fields to metadata
+  if(productInfo.productName) payeeMetadata.product_name = productInfo.productName;
+  if(productInfo.productId) payeeMetadata.product_id = productInfo.productId;
+  if(productInfo.contractUuid) payeeMetadata.contract_uuid = productInfo.contractUuid;
+  if(productInfo.emojicode) payeeMetadata.emojicode = productInfo.emojicode;
+
+  // Create payment intent with description + metadata
+  const paymentIntent = await stripeSDK.paymentIntents.create({
+    description: description, // Shows prominently in dashboard
+    metadata: payeeMetadata,
+    // ... other fields
+  });
+}
+```
+
+**Transfer Creation** (`processPaymentTransfers` function):
+```javascript
+// Read product info from payment intent metadata
+const productName = metadata.product_name || 'Product';
+const commissionType = i === 0 ? 'Affiliate' : 'Creator';
+
+// Create descriptive transfer
+const transfer = await stripeSDK.transfers.create({
+  description: `${productName} - ${commissionType} payout`,
+  metadata: {
+    product_name: metadata.product_name,
+    commission_type: commissionType.toLowerCase(),
+    payee_pubkey: pubKey.substring(0, 20),
+    original_payment_intent: paymentIntentId,
+    // Optional fields copied from payment intent
+    product_id: metadata.product_id,
+    contract_uuid: metadata.contract_uuid,
+    emojicode: metadata.emojicode
+  }
+});
+```
+
+### Benefits
+
+1. **Easy Reconciliation**: See exactly which product generated each payment
+2. **Debugging**: Trace payments from purchase → transfers using metadata
+3. **Reporting**: Filter Stripe Dashboard by product name or ID
+4. **Transparency**: Clear descriptions for all parties involved
+5. **Contract Linking**: Connect payments to Covenant contracts via UUID
+
+### Example Dashboard Flow
+
+1. **Payment List**: "Purchase: Advanced React Course (with affiliate commission)"
+2. **Click Payment**: See full metadata with product details and payee split
+3. **View Transfers**: Two transfers show:
+   - "Advanced React Course - Affiliate payout" ($5)
+   - "Advanced React Course - Creator payout" ($45)
+4. **Search**: Search for "Advanced React Course" to see all related transactions
+
 ## Last Updated
-November 1, 2025 - Converted from Stripe Connected Accounts to direct debit card payouts for instant affiliate commissions. All endpoints tested via Sharon test suite. Ready for production deployment.
+November 1, 2025 - Added product metadata to payment intents and transfers for Stripe Dashboard visibility. Converted from Stripe Connected Accounts to direct debit card payouts for instant affiliate commissions. All endpoints tested via Sharon test suite. Ready for production deployment.

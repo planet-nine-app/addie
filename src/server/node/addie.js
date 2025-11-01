@@ -164,6 +164,14 @@ console.log('trying to get payment intent');
     const savePaymentMethod = body.savePaymentMethod;
     const signature = body.signature;
 
+    // Extract product info from request body (optional)
+    const productInfo = {
+      productName: body.productName,
+      productId: body.productId,
+      contractUuid: body.contractUuid,
+      emojicode: body.emojicode
+    };
+
     const foundUser = await user.getUserByUUID(uuid);
 
     const message = timestamp + uuid + amount + currency;
@@ -179,7 +187,7 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod);
+      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod, productInfo);
         break;
       case 'square': paymentTokenResponse = await square.getSquarePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod);
         break;
