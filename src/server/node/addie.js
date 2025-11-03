@@ -277,8 +277,22 @@ app.get('/saved-payment-methods', async (req, res) => {
     }
 
     switch(processor) {
-      case 'stripe': const result = await stripe.getSavedPaymentMethods(foundUser);
-        res.json(result);
+      case 'stripe':
+        // Get both saved payment methods and issued cards
+        const savedMethods = await stripe.getSavedPaymentMethods(foundUser);
+        const issuedCards = await stripe.getIssuedCards(foundUser);
+
+        // Combine the results
+        const combinedResult = {
+          paymentMethods: savedMethods.paymentMethods || [],
+          issuedCards: issuedCards.cards || []
+        };
+
+console.log('Combined payment methods and issued cards:',
+  combinedResult.paymentMethods.length, 'payment methods,',
+  combinedResult.issuedCards.length, 'issued cards');
+
+        res.json(combinedResult);
         break;
       default: throw new Error('processor not found');
     }

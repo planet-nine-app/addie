@@ -439,7 +439,6 @@ console.error('Error creating SetupIntent:', err);
             year: individualInfo.dob.year
           }
         },
-        tos_acceptance: tosAcceptance,
         status: 'active'
       });
 
