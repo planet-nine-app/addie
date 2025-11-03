@@ -86,6 +86,7 @@ console.log('auth error');
     let foundUser;
     try {
       foundUser = await user.getUserByPublicKey(pubKey);
+    }
     catch(err) {
 console.log('no user found. Creating a new one');
     }
