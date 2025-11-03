@@ -83,7 +83,12 @@ console.log('auth error');
     }
 
     // Check if user already exists with this pubKey
-    let foundUser = await user.getUserByPublicKey(pubKey);
+    let foundUser;
+    try {
+      foundUser = await user.getUserByPublicKey(pubKey);
+    catch(err) {
+console.log('no user found. Creating a new one');
+    }
 
     // If user doesn't exist, create new one
     if(!foundUser) {
