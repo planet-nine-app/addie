@@ -34,7 +34,7 @@ Addie is a Planet Nine allyabase microservice that handles payment processing an
 - `POST /processor/stripe/payment-intent-without-splits` - Create simple payment intent
 
 ### Stripe Issuing (Virtual Cards for the Unbanked)
-- `POST /processor/stripe/cardholder` - Create Stripe Issuing cardholder
+- `POST /issuing/cardholder` - Create Stripe Issuing cardholder with KYC information
 - `POST /processor/stripe/issue-virtual-card` - Issue virtual debit card
 - `GET /processor/stripe/issued-cards` - Get user's issued cards
 - `GET /processor/stripe/transactions` - Get card transactions
@@ -564,5 +564,243 @@ const transfer = await stripeSDK.transfers.create({
    - "Advanced React Course - Creator payout" ($45)
 4. **Search**: Search for "Advanced React Course" to see all related transactions
 
+## Stripe Issuing Cardholder Creation (November 2025)
+
+### Overview
+
+Addie provides a complete Stripe Issuing cardholder creation endpoint that collects KYC information from The Advancement apps and creates Stripe cardholders with proper TOS acceptance tracking.
+
+### Endpoint
+
+#### POST /issuing/cardholder
+
+Creates a Stripe Issuing cardholder for users without traditional bank accounts.
+
+**Request**:
+```json
+{
+  "timestamp": "1234567890",
+  "pubKey": "02a1b2c3...",
+  "signature": "3045022100...",
+  "individualInfo": {
+    "firstName": "Jenny",
+    "lastName": "Rosen",
+    "name": "Jenny Rosen",
+    "email": "jenny.rosen@example.com",
+    "phoneNumber": "+18888675309",
+    "dob": {
+      "month": 1,
+      "day": 1,
+      "year": 1990
+    },
+    "address": {
+      "line1": "1234 Main Street",
+      "line2": "Apt 4B",
+      "city": "San Francisco",
+      "state": "CA",
+      "postal_code": "94111",
+      "country": "US"
+    }
+  }
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "cardholderId": "ich_1AbCdEfGhIjKlMn",
+  "status": "active"
+}
+```
+
+**Response (Error)**:
+```json
+{
+  "success": false,
+  "error": "The cardholder must provide a first and last name."
+}
+```
+
+**Implementation** (`src/server/node/addie.js:422-443`):
+```javascript
+app.post('/issuing/cardholder', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const individualInfo = body.individualInfo;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    const message = timestamp + pubKey;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    let foundUser = await user.getUserByPublicKey(pubKey);
+    if(!foundUser) {
+      foundUser = await user.putUser({ pubKey });
+    }
+
+    const result = await stripe.createCardholder(foundUser, individualInfo, ip);
+
+    console.log('Cardholder created:', result.cardholderId);
+    res.send(result);
+  } catch(err) {
+    console.error('Error creating cardholder:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to create cardholder'});
+  }
+});
+```
+
+**Signature**: `timestamp + pubKey`
+
+### Stripe Processor Function
+
+**createCardholder** (`src/server/node/src/processors/stripe.js:400-444`):
+```javascript
+createCardholder: async (foundUser, individualInfo, ip) => {
+  try {
+    const { name, email, phoneNumber, address } = individualInfo;
+
+    // Build billing address, only including line2 if it exists
+    const billingAddress = {
+      line1: address.line1,
+      city: address.city,
+      state: address.state,
+      postal_code: address.postal_code,
+      country: address.country || 'US'
+    };
+
+    // Only include line2 if it's not empty (Stripe requirement)
+    if (address.line2 && address.line2.trim()) {
+      billingAddress.line2 = address.line2;
+    }
+
+    // Build TOS acceptance with actual user IP
+    const tosAcceptance = {
+      date: Math.floor(Date.now() / 1000),
+      ip: ip || '0.0.0.0'
+    };
+
+    // Create Stripe Issuing Cardholder
+    const cardholder = await stripeSDK.issuing.cardholders.create({
+      type: 'individual',
+      name: name,
+      email: email,
+      phone_number: phoneNumber,
+      billing: {
+        address: billingAddress
+      },
+      individual: {
+        first_name: individualInfo.firstName,
+        last_name: individualInfo.lastName,
+        dob: {
+          day: individualInfo.dob.day,
+          month: individualInfo.dob.month,
+          year: individualInfo.dob.year
+        }
+      },
+      tos_acceptance: tosAcceptance,
+      status: 'active'
+    });
+
+    // Save cardholder ID to user record
+    foundUser.stripeCardholderId = cardholder.id;
+    await user.saveUser(foundUser);
+
+    return {
+      success: true,
+      cardholderId: cardholder.id,
+      status: cardholder.status
+    };
+  } catch(err) {
+    console.error('Error creating cardholder:', err);
+    return { success: false, error: err.message };
+  }
+}
+```
+
+### Key Implementation Details
+
+**1. Real User IP Extraction**:
+- Backend extracts IP from request headers: `req.headers['x-forwarded-for'] || req.socket.remoteAddress`
+- IP is required for TOS acceptance compliance
+- Handles both direct connections and proxied requests
+
+**2. Conditional line2 Field**:
+- Stripe rejects optional fields with null or empty string values
+- Backend only includes `line2` in billingAddress if not empty
+- Pattern: Build base object first, conditionally add optional fields
+
+**3. TOS Acceptance**:
+- Constructed by backend with real user IP and timestamp
+- Frontend validates checkbox, but doesn't send tosAcceptance object
+- Backend controls TOS data to ensure compliance
+
+**4. Required Fields**:
+- `firstName` and `lastName` - Required by Stripe Issuing
+- `name` - Full name for cardholder
+- `email` - Contact information
+- `phoneNumber` - Contact information
+- `dob` - Date of birth with day, month, year
+- `address` - Billing address with line1, city, state, postal_code, country
+
+**5. Storage**:
+- Cardholder ID saved to user record as `stripeCardholderId`
+- Enables future card issuance and management
+
+### Error Handling
+
+**Empty line2 Error**:
+```
+You passed an empty string for 'billing[address][line2]'. We assume empty values are an attempt to unset a parameter; however 'billing[address][line2]' cannot be unset.
+```
+**Fix**: Conditionally build billingAddress object, only include line2 if not empty string.
+
+**Missing firstName/lastName Error**:
+```
+The cardholder must provide a first and last name.
+```
+**Fix**: Ensure The Advancement app extracts and forwards firstName/lastName fields.
+
+**Missing TOS Acceptance Error**:
+```
+The cardholder must agree to the user terms and privacy policy.
+```
+**Fix**: Backend constructs tosAcceptance with real user IP from request headers.
+
+### Integration with The Advancement
+
+The Advancement iOS and Android apps call this endpoint after collecting KYC information through HTML forms:
+
+**iOS** (`PaymentMethodViewController.swift`):
+```swift
+private func createCardholder(params: [String: Any], messageId: Any) {
+    // Extract firstName, lastName from individualInfo
+    // Forward to POST /issuing/cardholder
+}
+```
+
+**Android** (`PaymentMethodActivity.kt`):
+```kotlin
+suspend fun createCardholder(paramsJson: String): String {
+    // Extract fields from params
+    // POST to /issuing/cardholder
+}
+```
+
+### Benefits
+
+1. **Financial Inclusion**: Users without bank accounts can receive virtual debit cards
+2. **Real KYC**: Proper identity verification with required fields
+3. **TOS Compliance**: Legally binding acceptance with IP and timestamp tracking
+4. **Multi-Platform**: Same backend endpoint for iOS and Android
+5. **Instant Issuance**: Cards can be issued immediately after cardholder creation
+
 ## Last Updated
-November 1, 2025 - Added product metadata to payment intents and transfers for Stripe Dashboard visibility. Converted from Stripe Connected Accounts to direct debit card payouts for instant affiliate commissions. All endpoints tested via Sharon test suite. Ready for production deployment.
+November 2, 2025 - Added Stripe Issuing cardholder creation endpoint with proper KYC handling, TOS acceptance tracking, and conditional field logic. Handles firstName/lastName requirements and real user IP extraction. Product metadata added to payment intents and transfers for Stripe Dashboard visibility. Converted from Stripe Connected Accounts to direct debit card payouts for instant affiliate commissions. All endpoints tested via Sharon test suite. Ready for production deployment.
