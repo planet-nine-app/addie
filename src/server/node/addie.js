@@ -82,7 +82,17 @@ console.log('auth error');
       return res.send({error: 'auth error'});
     }
 
-    const foundUser = await user.putUser({ pubKey });
+    // Check if user already exists with this pubKey
+    let foundUser = await user.getUserByPublicKey(pubKey);
+
+    // If user doesn't exist, create new one
+    if(!foundUser) {
+      foundUser = await user.putUser({ pubKey });
+console.log('Created new user:', foundUser.uuid);
+    } else {
+console.log('Found existing user:', foundUser.uuid);
+    }
+
     res.send(foundUser);
   } catch(err) {
 console.warn(err);
