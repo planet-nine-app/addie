@@ -426,6 +426,7 @@ app.post('/issuing/cardholder', async (req, res) => {
     const pubKey = body.pubKey;
     const signature = body.signature;
     const individualInfo = body.individualInfo;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     const message = timestamp + pubKey;
 
@@ -439,7 +440,7 @@ app.post('/issuing/cardholder', async (req, res) => {
       foundUser = await user.putUser({ pubKey });
     }
 
-    const result = await stripe.createCardholder(foundUser, individualInfo);
+    const result = await stripe.createCardholder(foundUser, individualInfo, ip);
 
 console.log('Cardholder created:', result.cardholderId);
 

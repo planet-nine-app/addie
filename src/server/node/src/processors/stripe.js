@@ -397,9 +397,29 @@ console.error('Error creating SetupIntent:', err);
   },
 
   // Stripe Issuing - Create a cardholder for the unbanked
-  createCardholder: async (foundUser, individualInfo) => {
+  createCardholder: async (foundUser, individualInfo, ip) => {
     try {
       const { name, email, phoneNumber, address } = individualInfo;
+
+      // Build billing address, only including line2 if it exists (Stripe requirement)
+      const billingAddress = {
+        line1: address.line1,
+        city: address.city,
+        state: address.state,
+        postal_code: address.postal_code,
+        country: address.country || 'US'
+      };
+
+      // Only include line2 if it's not empty (Stripe doesn't allow null or empty string)
+      if (address.line2 && address.line2.trim()) {
+        billingAddress.line2 = address.line2;
+      }
+
+      // Build TOS acceptance with actual user IP
+      const tosAcceptance = {
+        date: Math.floor(Date.now() / 1000),
+        ip: ip || '0.0.0.0'
+      };
 
       // Create Stripe Issuing Cardholder
       const cardholder = await stripeSDK.issuing.cardholders.create({
@@ -408,14 +428,7 @@ console.error('Error creating SetupIntent:', err);
         email: email,
         phone_number: phoneNumber,
         billing: {
-          address: {
-            line1: address.line1,
-            line2: address.line2 || null,
-            city: address.city,
-            state: address.state,
-            postal_code: address.postal_code,
-            country: address.country || 'US'
-          }
+          address: billingAddress
         },
         individual: {
           first_name: individualInfo.firstName,
@@ -426,6 +439,7 @@ console.error('Error creating SetupIntent:', err);
             year: individualInfo.dob.year
           }
         },
+        tos_acceptance: tosAcceptance,
         status: 'active'
       });
 
