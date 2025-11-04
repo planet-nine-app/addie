@@ -447,6 +447,44 @@ console.error('Error creating SetupIntent:', err);
   }
 });
 
+// Update payment method to set allow_redisplay = 'always'
+app.post('/processor/:processor/payment-method/:paymentMethodId/allow-redisplay', async (req, res) => {
+  try {
+    const processor = req.params.processor;
+    const paymentMethodId = req.params.paymentMethodId;
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+
+    // Message for authentication: timestamp + pubKey + paymentMethodId
+    const message = timestamp + pubKey + paymentMethodId;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    let result;
+
+    switch(processor) {
+      case 'stripe':
+        result = await stripe.updatePaymentMethodAllowRedisplay(paymentMethodId);
+        break;
+      default:
+        throw new Error('processor not found');
+    }
+
+console.log('Payment method updated with allow_redisplay: always');
+
+    res.send(result);
+  } catch(err) {
+console.error('Error updating payment method:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to update payment method'});
+  }
+});
+
 // Card Issuing Endpoints
 
 app.post('/issuing/cardholder', async (req, res) => {
