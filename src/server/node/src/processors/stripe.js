@@ -81,23 +81,29 @@ const stripe = {
     // Validate and prepare payee data for metadata
     let payeeMetadata = {};
     if(payees && payees.length > 0) {
-      // Validate that all payees have Stripe accounts
+      // Store payee info in metadata for post-payment processing
+      let validPayeeCount = 0;
       for(var i = 0; i < payees.length; i++) {
         const payee = payees[i];
-        try {
-          const payeeUser = await user.getUserByPublicKey(payee.pubKey);
-          if(!payeeUser.stripeAccountId) {
-            console.warn(`⚠️ Payee ${payee.pubKey} does not have a Stripe account, skipping`);
-            continue;
-          }
-          // Store payee info in metadata (Stripe metadata has 500 char limit per value)
-          payeeMetadata[`payee_${i}_pubkey`] = payee.pubKey;
-          payeeMetadata[`payee_${i}_amount`] = payee.amount.toString();
-        } catch(err) {
-          console.warn(`⚠️ Payee ${payee.pubKey} not found in system, skipping`);
+        // Store payee info in metadata (Stripe metadata has 500 char limit per value)
+        payeeMetadata[`payee_${validPayeeCount}_pubkey`] = payee.pubKey;
+        payeeMetadata[`payee_${validPayeeCount}_amount`] = payee.amount.toString();
+
+        // Store addieURL and signature for cross-base commerce
+        if(payee.addieURL) {
+          payeeMetadata[`payee_${validPayeeCount}_addieurl`] = payee.addieURL;
         }
+        if(payee.signature) {
+          // Truncate signature if needed (metadata limit is 500 chars)
+          payeeMetadata[`payee_${validPayeeCount}_signature`] = payee.signature.substring(0, 450);
+        }
+        if(payee.percent !== undefined) {
+          payeeMetadata[`payee_${validPayeeCount}_percent`] = payee.percent.toString();
+        }
+
+        validPayeeCount++;
       }
-      payeeMetadata.payee_count = Object.keys(payeeMetadata).filter(k => k.endsWith('_pubkey')).length.toString();
+      payeeMetadata.payee_count = validPayeeCount.toString();
     }
 
     // Add product information to metadata (if provided)
@@ -231,11 +237,45 @@ const stripe = {
     let accountsAndAmounts = [];
     for(var i = 0; i < payees.length; i++) {
       const payee = payees[i];
-      const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
-      accountsAndAmounts.push({
-        account,
-        amount: payee.amount
-      });
+
+      // Fetch Addie user from payee's addieURL (supports cross-base commerce)
+      let payeeUser = null;
+      if(payee.addieURL && payee.signature) {
+        try {
+          // Verify payee signature and get Addie user from their base
+          const verifyResponse = await fetch(`${payee.addieURL}/verify-payee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pubKey: payee.pubKey,
+              addieURL: payee.addieURL,
+              percent: payee.percent,
+              signature: payee.signature
+            })
+          });
+
+          if(verifyResponse.ok) {
+            const result = await verifyResponse.json();
+            payeeUser = result.addieUser;
+          }
+        } catch(err) {
+          console.warn(`⚠️ Failed to fetch payee from ${payee.addieURL}:`, err.message);
+        }
+      }
+
+      // Fallback to local database lookup
+      if(!payeeUser) {
+        payeeUser = await user.getUserByPublicKey(payee.pubKey);
+      }
+
+      if(payeeUser && payeeUser.stripeAccountId) {
+        accountsAndAmounts.push({
+          account: payeeUser.stripeAccountId,
+          amount: payee.amount
+        });
+      } else {
+        console.warn(`⚠️ Payee ${payee.pubKey} has no Stripe account, skipping`);
+      }
     }
 
     const transferPromises = accountsAndAmounts.map(accountAndAmount => {
@@ -315,11 +355,45 @@ console.error('Error fetching payment methods:', error);
         let accountsAndAmounts = [];
         for(var i = 0; i < payees.length; i++) {
           const payee = payees[i];
-	  const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
-	  accountsAndAmounts.push({
-	    account,
-	    amount: payee.amount
-	  });
+
+          // Fetch Addie user from payee's addieURL (supports cross-base commerce)
+          let payeeUser = null;
+          if(payee.addieURL && payee.signature) {
+            try {
+              // Verify payee signature and get Addie user from their base
+              const verifyResponse = await fetch(`${payee.addieURL}/verify-payee`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  pubKey: payee.pubKey,
+                  addieURL: payee.addieURL,
+                  percent: payee.percent,
+                  signature: payee.signature
+                })
+              });
+
+              if(verifyResponse.ok) {
+                const result = await verifyResponse.json();
+                payeeUser = result.addieUser;
+              }
+            } catch(err) {
+              console.warn(`⚠️ Failed to fetch payee from ${payee.addieURL}:`, err.message);
+            }
+          }
+
+          // Fallback to local database lookup
+          if(!payeeUser) {
+            payeeUser = await user.getUserByPublicKey(payee.pubKey);
+          }
+
+          if(payeeUser && payeeUser.stripeAccountId) {
+            accountsAndAmounts.push({
+              account: payeeUser.stripeAccountId,
+              amount: payee.amount
+            });
+          } else {
+            console.warn(`⚠️ Payee ${payee.pubKey} has no Stripe account, skipping`);
+          }
         }
       
         const transferPromises = accountsAndAmounts.map(accountAndAmount => {
@@ -683,11 +757,45 @@ console.log('amount', amount);
       let accountsAndAmounts = [];
       for(var i = 0; i < payees.length; i++) {
 	const payee = payees[i];
-	const account = (await user.getUserByPublicKey(payee.pubKey)).stripeAccountId;
-	accountsAndAmounts.push({
-	  account,
-	  amount: (payee.minimumCost - payee.minimumCost * 0.05)
-	});
+
+        // Fetch Addie user from payee's addieURL (supports cross-base commerce)
+        let payeeUser = null;
+        if(payee.addieURL && payee.signature) {
+          try {
+            // Verify payee signature and get Addie user from their base
+            const verifyResponse = await fetch(`${payee.addieURL}/verify-payee`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pubKey: payee.pubKey,
+                addieURL: payee.addieURL,
+                percent: payee.percent,
+                signature: payee.signature
+              })
+            });
+
+            if(verifyResponse.ok) {
+              const result = await verifyResponse.json();
+              payeeUser = result.addieUser;
+            }
+          } catch(err) {
+            console.warn(`⚠️ Failed to fetch payee from ${payee.addieURL}:`, err.message);
+          }
+        }
+
+        // Fallback to local database lookup
+        if(!payeeUser) {
+          payeeUser = await user.getUserByPublicKey(payee.pubKey);
+        }
+
+        if(payeeUser && payeeUser.stripeAccountId) {
+          accountsAndAmounts.push({
+            account: payeeUser.stripeAccountId,
+            amount: (payee.minimumCost - payee.minimumCost * 0.05)
+          });
+        } else {
+          console.warn(`⚠️ Payee ${payee.pubKey} has no Stripe account, skipping`);
+        }
       }
 console.log('accountsAndAmounrs', accountsAndAmounts);
 
@@ -830,6 +938,9 @@ console.warn(err);
       for(let i = 0; i < payeeCount; i++) {
         const pubKey = metadata[`payee_${i}_pubkey`];
         const amount = parseInt(metadata[`payee_${i}_amount`]);
+        const addieURL = metadata[`payee_${i}_addieurl`];
+        const signature = metadata[`payee_${i}_signature`];
+        const percent = metadata[`payee_${i}_percent`];
 
         if(!pubKey || !amount) {
           console.warn(`⚠️ Missing payee data for index ${i}`);
@@ -837,9 +948,39 @@ console.warn(err);
         }
 
         try {
-          // Look up payee's saved payout card
-          const payeeUser = await user.getUserByPublicKey(pubKey);
-          if(!payeeUser.stripePayoutCardId) {
+          // Fetch Addie user from payee's addieURL (supports cross-base commerce)
+          let payeeUser = null;
+          if(addieURL && signature && percent) {
+            try {
+              console.log(`🌐 Fetching payee from remote base: ${addieURL}`);
+              const verifyResponse = await fetch(`${addieURL}/verify-payee`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  pubKey: pubKey,
+                  addieURL: addieURL,
+                  percent: parseInt(percent),
+                  signature: signature
+                })
+              });
+
+              if(verifyResponse.ok) {
+                const result = await verifyResponse.json();
+                payeeUser = result.addieUser;
+                console.log(`✅ Fetched payee from remote base`);
+              }
+            } catch(err) {
+              console.warn(`⚠️ Failed to fetch payee from ${addieURL}:`, err.message);
+            }
+          }
+
+          // Fallback to local database lookup
+          if(!payeeUser) {
+            console.log(`📍 Using local database lookup for payee`);
+            payeeUser = await user.getUserByPublicKey(pubKey);
+          }
+
+          if(!payeeUser || !payeeUser.stripePayoutCardId) {
             console.warn(`⚠️ Payee ${pubKey} does not have a payout card saved, skipping transfer`);
             continue;
           }

@@ -773,6 +773,42 @@ console.error('Error checking payout card status:', err);
   }
 });
 
+app.post('/verify-payee', async (req, res) => {
+  try {
+    const body = req.body;
+    const pubKey = body.pubKey;
+    const addieURL = body.addieURL;
+    const percent = body.percent;
+    const signature = body.signature;
+
+    // Verify signature: pubKey + addieURL + percent
+    const message = pubKey + addieURL + percent;
+
+    if(!signature || !sessionless.verifySignature(signature, message, pubKey)) {
+      res.status(403);
+      return res.send({error: 'Invalid payee signature'});
+    }
+
+    // Fetch Addie user by pubKey
+    const addieUser = await user.getUserByPublicKey(pubKey);
+    if(!addieUser) {
+      res.status(404);
+      return res.send({error: 'Payee not found in Addie'});
+    }
+
+console.log('✅ Verified payee:', pubKey.substring(0, 16) + '...');
+
+    res.send({
+      success: true,
+      addieUser: addieUser
+    });
+  } catch(err) {
+console.error('❌ Error verifying payee:', err);
+    res.status(404);
+    res.send({error: err.message || 'Failed to verify payee'});
+  }
+});
+
 app.post('/payment/:paymentIntentId/process-transfers', async (req, res) => {
   try {
     const paymentIntentId = req.params.paymentIntentId;
