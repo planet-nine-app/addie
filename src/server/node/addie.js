@@ -307,11 +307,13 @@ app.post('/charge-with-saved-method', async (req, res) => {
   try {
     const body = req.body;
     const uuid = body.uuid;
+    const timestamp = body.timestamp;
+    const signature = body.signature;
     const amount = body.amount;
     const currency = body.currency;
     const paymentMethodId = body.paymentMethodId;
     const payees = body.payees || [];
-    
+
     const foundUser = await user.getUserByUUID(uuid);
 
     const message = timestamp + uuid + amount + paymentMethodId;

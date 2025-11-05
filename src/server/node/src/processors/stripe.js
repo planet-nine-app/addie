@@ -452,22 +452,19 @@ console.error('error removing payment method', err);
         await user.saveUser(foundUser);
       }
 
-      // Create SetupIntent with allow_redisplay set to 'always'
+      // Create SetupIntent
+      // Note: allow_redisplay cannot be set here - must be updated after payment method is attached
       const setupIntent = await stripeSDK.setupIntents.create({
         customer: actualCustomerId,
         payment_method_types: ['card'],
-        usage: 'off_session', // For future payments
-        payment_method_options: {
-          card: {
-            setup_future_usage: 'off_session'
-          }
-        }
+        usage: 'off_session' // For future payments
       });
 
+      console.log('✅ SetupIntent created:', setupIntent.id);
+
       // CRITICAL: After SetupIntent is confirmed and payment method is attached,
-      // update the payment method to set allow_redisplay = 'always'
-      // This must be done via webhook or after confirmation, not here
-      // The iOS app should call a new endpoint after SetupIntent succeeds
+      // the iOS app calls POST /processor/stripe/payment-method/:id/allow-redisplay
+      // to update the payment method with allow_redisplay = 'always'
 
       return {
         clientSecret: setupIntent.client_secret,
