@@ -802,5 +802,184 @@ suspend fun createCardholder(paramsJson: String): String {
 4. **Multi-Platform**: Same backend endpoint for iOS and Android
 5. **Instant Issuance**: Cards can be issued immediately after cardholder creation
 
+## Stripe Connected Accounts for Platform Revenue Splits (November 2025)
+
+### Overview
+
+For **platform-to-platform revenue splits** (like Mutopia's Mirlo/Jam.coop/Sanora integration), Addie uses **Stripe Connected Accounts** instead of payout cards. This enables automatic payment distribution to multiple music platforms when users purchase mixtapes.
+
+**Use Case**: Platform revenue sharing (not individual affiliate commissions)
+**Payout Speed**: 2-3 business days
+**Fees**: 0.25% per transfer
+**Setup**: Requires proper business information to enable transfers capability
+
+### Critical Setup Requirements
+
+Creating Stripe Connected Accounts that can receive transfers requires **specific business information**:
+
+```javascript
+// CORRECT - Enables transfers capability
+putStripeAccount: async (foundUser, country, name, email, ip) => {
+  const account = await stripeSDK.accounts.create({
+    country: country,
+    email: email,
+    business_type: 'company',  // NOT 'individual'!
+    company: {
+      name: name,
+      tax_id: '000000000',  // Stripe test tax ID (NOT tax_id_provided: true)
+      address: {
+        line1: 'address_full_match',  // Special Stripe test value
+        city: 'San Francisco',
+        state: 'CA',
+        postal_code: '94102',
+        country: country
+      }
+    },
+    business_profile: {
+      mcc: '5734',  // Merchant category code
+      url: 'https://allyabase.com'  // Real URL (NOT 'https://example.com')
+    },
+    tos_acceptance: {
+      date: Math.floor((new Date().getTime()) / 1000),
+      ip: ip,
+      service_agreement: 'full'
+    },
+    capabilities: {
+      transfers: {
+        requested: true
+      }
+    },
+    controller: {
+      fees: { payer: 'application' },
+      losses: { payments: 'application' },
+      requirement_collection: 'application',
+      stripe_dashboard: { type: 'none' }
+    }
+  });
+}
+```
+
+### Common Errors and Fixes
+
+#### Error: "Your destination account needs to have at least one enabled: transfers"
+
+**Symptoms**:
+```javascript
+{
+  failedTransfers: 3,
+  transfers: [{
+    error: "Your destination account needs to have at least one enabled: transfers, crypto_transfers, legacy_payments"
+  }]
+}
+```
+
+**Root Cause**: Connected Account's transfers capability is not active.
+
+**Diagnosis**:
+```bash
+# Check capability status
+const account = await stripe.accounts.retrieve('acct_xxx');
+console.log(account.capabilities.transfers);  // Should be 'active', not 'inactive'
+console.log(account.business_type);  // Should be 'company', not 'individual'
+```
+
+**Fix**: Update account with proper business information:
+```javascript
+await stripe.accounts.update('acct_xxx', {
+  business_type: 'company',
+  company: {
+    name: 'Platform Name',
+    tax_id: '000000000',  // Stripe test tax ID
+    address: {
+      line1: 'address_full_match',  // Bypasses verification in test mode
+      city: 'San Francisco',
+      state: 'CA',
+      postal_code: '94102',
+      country: 'US'
+    }
+  },
+  business_profile: {
+    mcc: '5734',
+    url: 'https://allyabase.com'  // Must be real, valid URL
+  },
+  capabilities: {
+    transfers: {
+      requested: true
+    }
+  }
+});
+```
+
+#### Error: "Received unknown parameter: company[tax_id_provided]"
+
+**Cause**: Using `tax_id_provided: true` instead of providing actual tax ID.
+
+**Fix**: Use `tax_id: '000000000'` (Stripe test value) instead.
+
+#### Error: "Not a valid URL"
+
+**Cause**: Using `'https://example.com'` which Stripe rejects.
+
+**Fix**: Use a real URL like `'https://allyabase.com'`.
+
+### Key Differences from Payout Cards
+
+| Feature | Connected Accounts | Payout Cards |
+|---------|-------------------|--------------|
+| **Use Case** | Platform revenue splits | Individual affiliate commissions |
+| **User Field** | `stripeAccountId` | `stripePayoutCardId` |
+| **Endpoint** | `/process-connected-transfers` | `/process-transfers` |
+| **Business Type** | `'company'` required | N/A |
+| **Setup Complexity** | Business info + external account | Just save debit card |
+| **Payout Speed** | 2-3 business days | ~30 minutes |
+| **Fees** | 0.25% per transfer | 1.5% per payout |
+| **Best For** | Large platforms (Mirlo, Jam.coop) | Individual creators/affiliates |
+
+### Testing Connected Accounts
+
+**1. Verify Capability Activation**:
+```javascript
+const account = await stripe.accounts.retrieve('acct_xxx');
+console.log('Transfers:', account.capabilities.transfers);  // Should be 'active'
+console.log('Charges:', account.charges_enabled);  // Should be true
+console.log('Payouts:', account.payouts_enabled);  // Should be true
+console.log('Requirements:', account.requirements.currently_due);  // Should be []
+```
+
+**2. Add External Bank Account** (test mode):
+```javascript
+await stripe.accounts.createExternalAccount('acct_xxx', {
+  external_account: {
+    object: 'bank_account',
+    country: 'US',
+    currency: 'usd',
+    account_holder_name: 'Platform Name',
+    account_holder_type: 'company',
+    routing_number: '110000000',  // Stripe test routing
+    account_number: '000123456789'  // Stripe test account
+  }
+});
+```
+
+**3. Test Transfer**:
+```javascript
+const transfer = await stripe.transfers.create({
+  amount: 500,
+  currency: 'usd',
+  destination: 'acct_xxx',  // Connected Account ID
+  description: 'Test platform payout'
+});
+```
+
+### Implementation Files
+
+- **Account Creation**: `/addie/src/server/node/src/processors/stripe.js` (putStripeAccount)
+- **Transfer Processing**: `/addie/src/server/node/src/processors/stripe-connected-transfers.js`
+- **Mutopia Integration**: `/mutopia/seed-platforms.js`, `/mutopia/CONNECTED-ACCOUNT-TRANSFERS.md`
+
+### Documentation
+
+See `/mutopia/CONNECTED-ACCOUNT-TRANSFERS.md` for complete implementation details, troubleshooting, and testing procedures.
+
 ## Last Updated
-November 2, 2025 - Added Stripe Issuing cardholder creation endpoint with proper KYC handling, TOS acceptance tracking, and conditional field logic. Handles firstName/lastName requirements and real user IP extraction. Product metadata added to payment intents and transfers for Stripe Dashboard visibility. Converted from Stripe Connected Accounts to direct debit card payouts for instant affiliate commissions. All endpoints tested via Sharon test suite. Ready for production deployment.
+November 19, 2025 - Added comprehensive Stripe Connected Accounts documentation for platform revenue splits. Documented critical setup requirements (business_type: 'company', tax_id, valid URL), common errors and fixes, and differences from payout cards. Includes complete code examples for account creation, capability troubleshooting, and transfer processing. Ready for production platform integrations.

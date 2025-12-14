@@ -40,6 +40,23 @@ const patch = async (url, payload) => {
 const addie = {
   baseURL: 'https://dev.addie.allyabase.com/',
 
+  /**
+   * Configure the Addie client for different environments
+   * @param {Object} config - Configuration options
+   * @param {string} config.baseURL - Direct base URL (e.g., 'http://127.0.0.1:5116/')
+   * @param {string} config.wikiBaseURL - Wiki proxy base URL (e.g., 'http://127.0.0.1:5124')
+   *                                      Will construct URL as: {wikiBaseURL}/plugin/allyabase/addie/
+   */
+  configure: (config) => {
+    if (config.wikiBaseURL) {
+      // Wiki proxy mode: route through wiki plugin
+      addie.baseURL = `${config.wikiBaseURL.replace(/\/$/, '')}/plugin/allyabase/addie/`;
+    } else if (config.baseURL) {
+      // Direct mode: use base URL as-is
+      addie.baseURL = config.baseURL.endsWith('/') ? config.baseURL : config.baseURL + '/';
+    }
+  },
+
   createUser: async (saveKeys, getKeys) => {
     const keys = (await getKeys()) || (await sessionless.generateKeys(saveKeys, getKeys))
     sessionless.getKeys = getKeys;

@@ -8,8 +8,11 @@ import db from './src/persistence/db.js';
 import fount from 'fount-js';
 import bdo from 'bdo-js';
 import sessionless from 'sessionless-node';
+import _stripe from 'stripe';
+import stripeConnectedTransfers from './src/processors/stripe-connected-transfers.js';
 
 const stripe = processors.stripe;
+const stripeSDK = _stripe(process.env.STRIPE_KEY);
 
 const allowedTimeDifference = 300000; // keep this relaxed for now
 
@@ -54,7 +57,12 @@ console.warn(err);
   }
 };
 
-repeat(bootstrap);
+// Skip Fount/BDO bootstrap if SKIP_BOOTSTRAP is set (for standalone/Mutopia mode)
+if (process.env.SKIP_BOOTSTRAP !== 'true') {
+  repeat(bootstrap);
+} else {
+  console.log('Skipping Fount/BDO bootstrap (SKIP_BOOTSTRAP=true)');
+}
 
 app.use((req, res, next) => {
   const requestTime = +req.query.timestamp || +req.body.timestamp;
@@ -849,11 +857,73 @@ console.error('❌ Error verifying payee:', err);
   }
 });
 
+// Demo endpoint for Mutopia mixtape creator (no auth required for prototype)
+// Creates real Stripe payment intent with split metadata
+// Note: Transfers are created AFTER payment succeeds via webhook or manual trigger
+app.post('/demo/payment/create', async (req, res) => {
+  try {
+    const { amount, currency, description, payees } = req.body;
+
+    if(!amount || !payees || payees.length === 0) {
+      res.status(400);
+      return res.send({error: 'Missing required fields: amount, payees'});
+    }
+
+    console.log(`🎵 Creating Mutopia mixtape payment: $${amount/100} with ${payees.length} platform splits`);
+
+    // Build payee metadata for Stripe Dashboard
+    const metadata = {
+      payee_count: payees.length.toString(),
+      product_name: description || 'Mutopia Mixtape'
+    };
+
+    payees.forEach((payee, i) => {
+      metadata[`payee_${i}_pubkey`] = payee.pubKey;
+      metadata[`payee_${i}_amount`] = payee.amount.toString();
+      metadata[`payee_${i}_name`] = payee.name || `Platform ${i+1}`;
+    });
+
+    // Create transfer group for linking payment to transfers
+    const transferGroup = 'mutopia_' + Date.now();
+
+    // Create Stripe payment intent with split metadata and transfer group
+    const paymentIntent = await stripeSDK.paymentIntents.create({
+      amount: amount,
+      currency: currency || 'usd',
+      description: description || 'Mutopia Mixtape Purchase',
+      metadata: metadata,
+      transfer_group: transferGroup,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      // Set application fee (optional - platform can take a cut)
+      // application_fee_amount: Math.floor(amount * 0.05), // 5% platform fee
+    });
+
+    console.log(`✅ Payment intent created: ${paymentIntent.id}`);
+    console.log(`💰 Split metadata stored for ${payees.length} platforms - visible in Stripe Dashboard`);
+    console.log(`🔗 Transfer group: ${transferGroup}`);
+    console.log(`⏳ Transfers will be created after payment confirmation`);
+    console.log(`   Call POST /payment/${paymentIntent.id}/process-transfers after payment succeeds`);
+
+    res.send({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      transferGroup: transferGroup
+    });
+  } catch(err) {
+    console.error('❌ Demo payment error:', err);
+    res.status(500);
+    res.send({error: err.message || 'Failed to create payment intent'});
+  }
+});
+
+// Process transfers to payout cards (for affiliate commissions)
 app.post('/payment/:paymentIntentId/process-transfers', async (req, res) => {
   try {
     const paymentIntentId = req.params.paymentIntentId;
 
-    console.log(`📡 Received request to process transfers for payment: ${paymentIntentId}`);
+    console.log(`📡 Received request to process payout card transfers for payment: ${paymentIntentId}`);
 
     const result = await stripe.processPaymentTransfers(paymentIntentId);
 
@@ -867,6 +937,28 @@ app.post('/payment/:paymentIntentId/process-transfers', async (req, res) => {
     console.error('❌ Error in process-transfers endpoint:', err);
     res.status(500);
     res.send({error: err.message || 'Failed to process transfers'});
+  }
+});
+
+// Process transfers to Connected Accounts (for platform revenue splits)
+app.post('/payment/:paymentIntentId/process-connected-transfers', async (req, res) => {
+  try {
+    const paymentIntentId = req.params.paymentIntentId;
+
+    console.log(`📡 Received request to process Connected Account transfers for payment: ${paymentIntentId}`);
+
+    const result = await stripeConnectedTransfers.processConnectedAccountTransfers(paymentIntentId);
+
+    if(result.success) {
+      res.send(result);
+    } else {
+      res.status(400);
+      res.send(result);
+    }
+  } catch(err) {
+    console.error('❌ Error in process-connected-transfers endpoint:', err);
+    res.status(500);
+    res.send({error: err.message || 'Failed to process Connected Account transfers'});
   }
 });
 

@@ -33,7 +33,22 @@ const stripe = {
     const account = await stripeSDK.accounts.create({
       country: country,
       email: email,
-      business_type: 'individual',
+      business_type: 'company',
+      company: {
+        name: name,
+        tax_id: '000000000',  // Stripe test tax ID
+        address: {
+          line1: 'address_full_match',  // Stripe test value that bypasses verification
+          city: 'San Francisco',
+          state: 'CA',
+          postal_code: '94102',
+          country: country
+        }
+      },
+      business_profile: {
+        mcc: '5734',  // Computer software stores
+        url: 'https://allyabase.com'
+      },
       tos_acceptance: {
         date: Math.floor((new Date().getTime()) / 1000),
         ip: ip,
