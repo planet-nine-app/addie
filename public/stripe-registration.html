@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Payee Registration - Addie</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #1565c0;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+        }
+
+        .result-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .result-item {
+            margin-bottom: 15px;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .result-value {
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 13px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .copy-btn {
+            margin-top: 8px;
+            width: auto;
+            padding: 8px 16px;
+            font-size: 12px;
+            background: #667eea;
+        }
+
+        .email-btn {
+            display: block;
+            width: 100%;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .email-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+        }
+
+        .instructions h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instructions p {
+            color: #856404;
+            line-height: 1.6;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .instructions strong {
+            color: #664d03;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏦 Stripe Payee Registration</h1>
+        <p class="subtitle">
+            Register your Stripe account to receive payments through the Planet Nine ecosystem.
+            This will create a payee record that can be used for payment splits across federated bases.
+        </p>
+
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="country">Country *</label>
+                <select id="country" required>
+                    <option value="">Select your country</option>
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="AU">Australia</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="ES">Spain</option>
+                    <option value="IT">Italy</option>
+                    <option value="JP">Japan</option>
+                    <option value="SG">Singapore</option>
+                    <option value="IE">Ireland</option>
+                    <option value="AT">Austria</option>
+                    <option value="BE">Belgium</option>
+                    <option value="DK">Denmark</option>
+                    <option value="FI">Finland</option>
+                    <option value="NO">Norway</option>
+                    <option value="SE">Sweden</option>
+                    <option value="CH">Switzerland</option>
+                </select>
+                <div class="help-text">Must be a country supported by Stripe Connect</div>
+            </div>
+
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" required placeholder="John Doe">
+                <div class="help-text">Your legal name as it appears on official documents</div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" required placeholder="john@example.com">
+                <div class="help-text">Email for Stripe account notifications</div>
+            </div>
+
+            <button type="submit" id="submitBtn">
+                Create Stripe Account & Payee Record
+            </button>
+        </form>
+
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import sessionless from 'https://unpkg.com/sessionless@0.10.0/dist/main.js';
+        import BDO from 'https://unpkg.com/bdo-js@1.0.59/bdo-bundle.js';
+
+        const form = document.getElementById('registrationForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        // Configure BDO
+        const ADDIE_URL = window.location.origin;
+        const BDO_URL = ADDIE_URL.replace(':3005', ':3003'); // Assume BDO on 3003
+        BDO.configure({ baseURL: BDO_URL });
+
+        function showStatus(message, type = 'info') {
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function showLoading(message) {
+            showStatus(`<div class="spinner"></div>${message}`, 'info');
+        }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (err) {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                return true;
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const country = document.getElementById('country').value;
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+
+            submitBtn.disabled = true;
+            resultsDiv.innerHTML = '';
+
+            try {
+                // Step 1: Generate keypair
+                showLoading('Generating cryptographic keys...');
+                const keys = sessionless.generateKeys();
+                const pubKey = keys.pubKey;
+                const privateKey = keys.privateKey;
+
+                // Step 2: Create Addie user
+                showLoading('Creating Addie user account...');
+                const timestamp = Date.now();
+                const createUserMessage = timestamp + pubKey;
+                const createUserSignature = sessionless.sign(privateKey, createUserMessage);
+
+                const createUserRes = await fetch(`${ADDIE_URL}/user/create`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pubKey,
+                        timestamp,
+                        signature: createUserSignature
+                    })
+                });
+
+                if (!createUserRes.ok) {
+                    throw new Error('Failed to create Addie user');
+                }
+
+                const addieUser = await createUserRes.json();
+                const uuid = addieUser.uuid;
+
+                // Step 3: Create Stripe account
+                showLoading('Creating Stripe Connect account...');
+                const stripeTimestamp = Date.now();
+                const stripeMessage = stripeTimestamp + uuid + name + email;
+                const stripeSignature = sessionless.sign(privateKey, stripeMessage);
+
+                const stripeRes = await fetch(`${ADDIE_URL}/user/${uuid}/processor/stripe`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        country,
+                        name,
+                        email,
+                        timestamp: stripeTimestamp,
+                        signature: stripeSignature
+                    })
+                });
+
+                if (!stripeRes.ok) {
+                    const error = await stripeRes.json();
+                    throw new Error(error.error || 'Failed to create Stripe account');
+                }
+
+                const stripeAccount = await stripeRes.json();
+
+                // Step 4: Create BDO user
+                showLoading('Creating BDO storage account...');
+                const bdoHash = 'payee-registry';
+                await BDO.createUser(bdoHash, { pubKey, privateKey });
+
+                // Step 5: Create payee 4-tuple BDO
+                showLoading('Creating payee record BDO...');
+                const payeeTuple = {
+                    pubKey: pubKey,
+                    amount: 0, // Base amount, can be overridden per transaction
+                    addieURL: ADDIE_URL,
+                    signature: sessionless.sign(privateKey, pubKey + ADDIE_URL)
+                };
+
+                const bdoTimestamp = Date.now();
+                const bdoUUID = await BDO.put(
+                    payeeTuple,
+                    bdoHash,
+                    pubKey
+                );
+
+                // Step 6: Make BDO public to get emojicode
+                showLoading('Making payee record public...');
+                const emojicode = await BDO.makePublic(bdoUUID, bdoHash, pubKey);
+
+                // Success!
+                showStatus('✅ Registration complete! Your Stripe account and payee record have been created.', 'success');
+
+                // Display results
+                resultsDiv.innerHTML = `
+                    <div class="result-box">
+                        <h3>🎉 Registration Successful</h3>
+
+                        <div class="result-item">
+                            <div class="result-label">BDO Public Key (Send this to zach@planetnine.app):</div>
+                            <div class="result-value">${bdoUUID}</div>
+                            <button class="copy-btn" onclick="copyToClipboard('${bdoUUID}')">📋 Copy</button>
+                        </div>
+
+                        <div class="result-item">
+                            <div class="result-label">Emojicode:</div>
+                            <div class="result-value">${emojicode}</div>
+                            <button class="copy-btn" onclick="copyToClipboard('${emojicode}')">📋 Copy</button>
+                        </div>
+
+                        <div class="result-item">
+                            <div class="result-label">Your Public Key:</div>
+                            <div class="result-value">${pubKey}</div>
+                            <button class="copy-btn" onclick="copyToClipboard('${pubKey}')">📋 Copy</button>
+                        </div>
+
+                        <div class="result-item">
+                            <div class="result-label">Addie UUID:</div>
+                            <div class="result-value">${uuid}</div>
+                            <button class="copy-btn" onclick="copyToClipboard('${uuid}')">📋 Copy</button>
+                        </div>
+
+                        <div class="result-item">
+                            <div class="result-label">Stripe Account ID:</div>
+                            <div class="result-value">${stripeAccount.stripeAccountId}</div>
+                            <button class="copy-btn" onclick="copyToClipboard('${stripeAccount.stripeAccountId}')">📋 Copy</button>
+                        </div>
+
+                        <div class="result-item">
+                            <div class="result-label">Addie URL:</div>
+                            <div class="result-value">${ADDIE_URL}</div>
+                        </div>
+                    </div>
+
+                    <div class="instructions">
+                        <h4>📧 Next Steps</h4>
+                        <p><strong>Important:</strong> Save your private key securely. You'll need it to sign transactions.</p>
+                        <div style="margin-top: 12px; padding: 10px; background: white; border-radius: 4px; font-family: monospace; word-break: break-all;">
+                            ${privateKey}
+                        </div>
+
+                        <a href="mailto:zach@planetnine.app?subject=${encodeURIComponent('Payee Registration')}&body=${encodeURIComponent(`BDO Public Key: ${bdoUUID}
+
+Emojicode: ${emojicode}
+
+Registration Details:
+- Name: ${name}
+- Email: ${email}
+- Country: ${country}
+
+Public Key: ${pubKey}
+Addie UUID: ${uuid}
+Stripe Account ID: ${stripeAccount.stripeAccountId}
+Addie URL: ${ADDIE_URL}
+
+Please add me to the payee registry.
+
+Thank you!`)}" class="email-btn">
+                            📧 Send Registration Email
+                        </a>
+
+                        <p style="margin-top: 15px; font-size: 12px; color: #666; text-align: center;">
+                            Click the button above to open your email client with all details pre-filled
+                        </p>
+                    </div>
+                `;
+
+                // Make copy buttons work
+                window.copyToClipboard = async (text) => {
+                    const success = await copyToClipboard(text);
+                    if (success) {
+                        showStatus('✅ Copied to clipboard!', 'success');
+                        setTimeout(() => {
+                            showStatus('✅ Registration complete! Your Stripe account and payee record have been created.', 'success');
+                        }, 2000);
+                    }
+                };
+
+            } catch (error) {
+                console.error('Registration error:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
