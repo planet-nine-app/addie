@@ -180,6 +180,44 @@ console.log('set status');
   }
 });
 
+app.put('/user/:uuid/processor/:processor/express', async (req, res) => {
+  try {
+    const uuid = req.params.uuid;
+    const processor = req.params.processor;
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const country = body.country;
+    const email = body.email;
+    const refreshUrl = body.refreshUrl;
+    const returnUrl = body.returnUrl;
+    const signature = body.signature;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    const message = timestamp + uuid + email;
+
+    if(!sessionless.verifySignature(signature, message, foundUser.pubKey)) {
+      res.status(403);
+      return res.send({error: 'Auth error'});
+    }
+
+    let updatedUser = foundUser;
+
+    switch(processor) {
+      case 'stripe': updatedUser = await stripe.putStripeExpressAccount(foundUser, country, email, refreshUrl, returnUrl);
+        break;
+      default: throw new Error('processor not found');
+    }
+
+    res.send(updatedUser);
+  } catch(err) {
+console.warn(err);
+    res.status(404);
+console.log('set status');
+    res.send({error: err});
+  }
+});
+
 app.post('/user/:uuid/processor/:processor/intent', async (req, res) => {
   try {
 console.log('trying to get payment intent');

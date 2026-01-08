@@ -79,6 +79,33 @@ const stripe = {
     return foundUser;
   },
 
+  putStripeExpressAccount: async (foundUser, country, email, refreshUrl, returnUrl) => {
+    const account = await stripeSDK.accounts.create({
+      type: 'express',
+      country: country,
+      email: email,
+      capabilities: {
+        transfers: {
+          requested: true
+        }
+      }
+    });
+
+    foundUser.stripeAccountId = account.id;
+    await user.saveUser(foundUser);
+
+    const accountLink = await stripeSDK.accountLinks.create({
+      account: account.id,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
+      type: 'account_onboarding',
+    });
+
+    foundUser.stripeOnboardingUrl = accountLink.url;
+
+    return foundUser;
+  },
+
   getStripePaymentIntent: async (foundUser, amount, currency, payees, savePaymentMethod = false, productInfo = {}) => {
     const customerId = foundUser.stripeCustomerId || (await stripeSDK.customers.create()).id;
     if(foundUser.stripeCustomerId !== customerId) {
