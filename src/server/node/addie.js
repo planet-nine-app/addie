@@ -17,9 +17,9 @@ const stripeSDK = _stripe(process.env.STRIPE_KEY);
 const allowedTimeDifference = 300000; // keep this relaxed for now
 
 const app = express();
+app.use(express.static('../../../public')); // Serve static files FIRST - before timestamp check
 app.use(cors());
 app.use(express.json());
-app.use(express.static('../../../public')); // Serve static files from addie/public
 
 const SUBDOMAIN = process.env.SUBDOMAIN || 'dev';
 fount.baseURL = process.env.LOCALHOST ? 'http://localhost:3006/' : `${SUBDOMAIN}.fount.allyabase.com/`;
