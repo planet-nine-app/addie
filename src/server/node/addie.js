@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import user from './src/user/user.js';
 import processors from './src/processors/processors.js';
 import MAGIC from './src/magic/magic.js';
@@ -11,13 +13,16 @@ import sessionless from 'sessionless-node';
 import _stripe from 'stripe';
 import stripeConnectedTransfers from './src/processors/stripe-connected-transfers.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const stripe = processors.stripe;
 const stripeSDK = _stripe(process.env.STRIPE_KEY);
 
 const allowedTimeDifference = 300000; // keep this relaxed for now
 
 const app = express();
-app.use(express.static('../../../public')); // Serve static files FIRST - before timestamp check
+app.use(express.static(join(__dirname, '../../../public'))); // Serve static files FIRST - before timestamp check
 app.use(cors());
 app.use(express.json());
 
