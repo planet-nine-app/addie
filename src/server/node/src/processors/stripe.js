@@ -28,6 +28,66 @@ if(!stripeKey) {
 
 const stripeSDK = _stripe(stripeKey);
 
+const validateAndPreparePayees = async (payees, foundUser) => {
+  const groupName = 'group_' + foundUser.uuid;
+  let payeeMetadata = {};
+
+  if(!payees || payees.length === 0) {
+    return { groupName, payeeMetadata };
+  }
+
+  let validPayeeCount = 0;
+  for(var i = 0; i < payees.length; i++) {
+    const payee = payees[i];
+
+    if(!payee.percent || payee.percent <= 0 || payee.percent > 9) {
+      continue;
+    }
+
+    let payeeUser;
+
+    if(payee.addieURL && payee.signature) {
+      try {
+        const verifyResponse = await fetch(`${payee.addieURL}/verify-payee`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pubKey: payee.pubKey,
+            addieURL: payee.addieURL,
+            percent: payee.percent,
+            signature: payee.signature
+          })
+        });
+
+        if(verifyResponse.ok) {
+          const result = await verifyResponse.json();
+          payeeUser = result.addieUser;
+        }
+      } catch(err) {
+        console.warn(`⚠️ Failed to fetch payee from ${payee.addieURL}:`, err.message);
+        continue;
+      }
+    }
+
+    payeeMetadata[`payee_${validPayeeCount}_pubkey`] = payee.pubKey;
+    payeeMetadata[`payee_${validPayeeCount}_amount`] = payee.amount.toString();
+
+    if(payee.addieURL) {
+      payeeMetadata[`payee_${validPayeeCount}_addieurl`] = payee.addieURL;
+    }
+    if(payee.signature) {
+      payeeMetadata[`payee_${validPayeeCount}_signature`] = payee.signature.substring(0, 450);
+    }
+
+    payeeMetadata[`payee_${validPayeeCount}_percent`] = payee.percent.toString();
+
+    validPayeeCount++;
+  }
+  payeeMetadata.payee_count = validPayeeCount.toString();
+
+  return { groupName, payeeMetadata };
+};
+
 const stripe = {
   putStripeAccount: async (foundUser, country, name, email, ip) => {
     const account = await stripeSDK.accounts.create({
@@ -118,35 +178,7 @@ const stripe = {
       {apiVersion: '2024-06-20'}
     );
 
-    const groupName = 'group_' + foundUser.uuid;
-
-    // Validate and prepare payee data for metadata
-    let payeeMetadata = {};
-    if(payees && payees.length > 0) {
-      // Store payee info in metadata for post-payment processing
-      let validPayeeCount = 0;
-      for(var i = 0; i < payees.length; i++) {
-        const payee = payees[i];
-        // Store payee info in metadata (Stripe metadata has 500 char limit per value)
-        payeeMetadata[`payee_${validPayeeCount}_pubkey`] = payee.pubKey;
-        payeeMetadata[`payee_${validPayeeCount}_amount`] = payee.amount.toString();
-
-        // Store addieURL and signature for cross-base commerce
-        if(payee.addieURL) {
-          payeeMetadata[`payee_${validPayeeCount}_addieurl`] = payee.addieURL;
-        }
-        if(payee.signature) {
-          // Truncate signature if needed (metadata limit is 500 chars)
-          payeeMetadata[`payee_${validPayeeCount}_signature`] = payee.signature.substring(0, 450);
-        }
-        if(payee.percent !== undefined) {
-          payeeMetadata[`payee_${validPayeeCount}_percent`] = payee.percent.toString();
-        }
-
-        validPayeeCount++;
-      }
-      payeeMetadata.payee_count = validPayeeCount.toString();
-    }
+    const { groupName, payeeMetadata } = await validateAndPreparePayees(payees, foundUser);
 
     // Add product information to metadata (if provided)
     if(productInfo.productName) {

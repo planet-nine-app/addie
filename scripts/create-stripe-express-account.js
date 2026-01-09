@@ -20,7 +20,11 @@ async function createStripeExpressAccount(email, country = 'US') {
   const message1 = timestamp1 + pubKey;
   const signature1 = await sessionless.sign(message1);
 
-  const createUserResponse = await fetch(`${ADDIE_URL}/user/create`, {
+  const url = `${ADDIE_URL}/user/create`;
+  console.log('Creating user at', url);
+console.log(fetch);
+
+  const createUserResponse = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -69,6 +73,20 @@ async function createStripeExpressAccount(email, country = 'US') {
   }
 
   console.log('\n✅ Stripe Express account created successfully!');
+
+  // Step 3: Generate Payee Quad
+  console.log('\n💎 Generating Payee Quad...');
+  const percent = 0; // Use 0 for flexible amounts per transaction
+  const payeeMessage = pubKey + ADDIE_URL + percent;
+  const payeeSignature = await sessionless.sign(payeeMessage);
+
+  const payeeQuad = {
+    pubKey,
+    addieURL: ADDIE_URL,
+    percent,
+    signature: payeeSignature
+  };
+
   console.log('\n📋 Account Details:');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('Addie UUID:', userData.uuid);
@@ -78,13 +96,16 @@ async function createStripeExpressAccount(email, country = 'US') {
   console.log('Email:', email);
   console.log('\n🔗 Onboarding URL:');
   console.log(stripeData.stripeOnboardingUrl);
+  console.log('\n💎 Payee Quad (for payment splits):');
+  console.log(JSON.stringify(payeeQuad, null, 2));
   console.log('\n🔑 Private Key (SAVE THIS!):', privateKey);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('\n📝 Next Steps:');
   console.log('1. Visit the onboarding URL above');
   console.log('2. Complete Stripe\'s verification process');
   console.log('3. Add bank account for receiving payouts');
-  console.log('4. Account will be ready to receive transfers\n');
+  console.log('4. Account will be ready to receive transfers');
+  console.log('5. Use the Payee Quad above in payment split arrays\n');
 }
 
 // Parse command line arguments
