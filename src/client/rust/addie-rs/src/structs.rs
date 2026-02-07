@@ -92,7 +92,8 @@ pub struct PaymentIntent {
     pub payment_intent: String,
     pub ephemeral_key: String,
     pub customer: String,
-    pub publishable_key: String
+    #[serde(default)]
+    pub publishable_key: Option<String>
 }
 
 impl PaymentIntent {
@@ -101,7 +102,7 @@ impl PaymentIntent {
             payment_intent: "".to_string(),
             ephemeral_key: "".to_string(),
             customer: "".to_string(),
-            publishable_key: "".to_string()
+            publishable_key: None
         }
     }
 }

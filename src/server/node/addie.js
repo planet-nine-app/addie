@@ -16,6 +16,7 @@ import stripeConnectedTransfers from './src/processors/stripe-connected-transfer
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const addieStripeURL = process.env.ADDIE_STRIPE_URL;
 const stripe = processors.stripe;
 const stripeSDK = _stripe(process.env.STRIPE_KEY);
 
@@ -166,7 +167,19 @@ app.put('/user/:uuid/processor/:processor', async (req, res) => {
     let updatedUser = foundUser;
 
     switch(processor) {
-      case 'stripe': updatedUser = await stripe.putStripeAccount(foundUser, country, name, email, ip);
+      case 'stripe': 
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}user/${uuid}/processor/stripe`, 
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          updatedUser = await stripe.putStripeAccount(foundUser, country, name, email, ip);
+        }
         break;
       default: throw new Error('processor not found');
     }
@@ -204,7 +217,19 @@ app.put('/user/:uuid/processor/:processor/express', async (req, res) => {
     let updatedUser = foundUser;
 
     switch(processor) {
-      case 'stripe': updatedUser = await stripe.putStripeExpressAccount(foundUser, country, email, refreshUrl, returnUrl);
+      case 'stripe': 
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}user/${uuid}/processor/stripe/express`, 
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          updatedUser = await stripe.putStripeExpressAccount(foundUser, country, email, refreshUrl, returnUrl);
+        }
         break;
       default: throw new Error('processor not found');
     }
@@ -255,7 +280,19 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod, productInfo);
+      case 'stripe': 
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}user/${uuid}/processor/stripe/intent`, 
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          paymentTokenResponse = await stripe.getStripePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod, productInfo);
+        }
         break;
       case 'square': paymentTokenResponse = await square.getSquarePaymentIntent(foundUser, amount, currency, payees, savePaymentMethod);
         break;
@@ -297,7 +334,19 @@ console.log('past auth');
     let paymentTokenResponse;
 
     switch(processor) {
-      case 'stripe': paymentTokenResponse = await stripe.getStripePaymentIntentWithoutSplits(foundUser, amount, currency, savePaymentMethod);
+      case 'stripe': 
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}user/${uuid}/processor/stripe/intent-without-splits`, 
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          paymentTokenResponse = await stripe.getStripePaymentIntentWithoutSplits(foundUser, amount, currency, savePaymentMethod);
+        }
         break;
       default: throw new Error('processor not found');
     }
@@ -485,7 +534,18 @@ app.post('/processor/:processor/setup-intent', async (req, res) => {
 
     switch(processor) {
       case 'stripe':
-        setupIntentResponse = await stripe.createSetupIntent(foundUser, customerId);
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}processor/stripe/setup-intent`, 
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          setupIntentResponse = await stripe.createSetupIntent(foundUser, customerId);
+        }
         break;
       default:
         throw new Error('processor not found');
@@ -523,7 +583,18 @@ app.post('/processor/:processor/payment-method/:paymentMethodId/allow-redisplay'
 
     switch(processor) {
       case 'stripe':
-        result = await stripe.updatePaymentMethodAllowRedisplay(paymentMethodId);
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}processor/stripe/payment-method/${paymentMethodId}/allow-redisplay`, 
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          result = await stripe.updatePaymentMethodAllowRedisplay(paymentMethodId);
+        }
         break;
       default:
         throw new Error('processor not found');
@@ -1066,7 +1137,19 @@ console.log('addieCaster', addieCaster);
 
     let paidOutResult;
     switch(processor) {
-      case 'stripe': paidOutResult = await stripe.payPayees(payees, groupName, spell.totalCost);
+      case 'stripe': 
+        if(addieStripeURL) {
+          const forwardResponse = await fetch(`${addieStripeURL}money/processor/stripe/user/${uuid}`, 
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(req.body)
+            }
+          );
+          return res.status(forwardResponse.status).send(await forwardResponse.json());
+        } else {
+          paidOutResult = await stripe.payPayees(payees, groupName, spell.totalCost);
+        }
         break;
       default: throw new Error('processor not found');
     }
