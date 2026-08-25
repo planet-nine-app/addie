@@ -122,6 +122,69 @@ app.get('/user/:uuid', async (req, res) => {
   }
 });
 
+// Lookup user by UUID for base admin payouts (no auth required)
+app.get('/user/lookup/:uuid', async (req, res) => {
+  try {
+    const uuid = req.params.uuid;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    // Return minimal information for base admin setup
+    res.send({
+      uuid: foundUser.uuid,
+      pubKey: foundUser.pubKey,
+      stripeCustomerId: foundUser.stripeCustomerId || null,
+      stripePayoutCardId: foundUser.stripePayoutCardId || null,
+      canReceivePayouts: !!foundUser.stripePayoutCardId
+    });
+  } catch(err) {
+    res.status(404);
+    res.send({error: 'not found'});
+  }
+});
+
+// SetupIntent endpoint for saving payment methods (used by The Advancement app)
+app.post('/processor/stripe/setup-intent', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const customerId = body.customerId;
+
+    // Verify signature if provided (optional for SetupIntent creation)
+    if (signature && pubKey) {
+      const message = timestamp + pubKey;
+      if (!sessionless.verifySignature(signature, message, pubKey)) {
+        res.status(403);
+        return res.send({error: 'Auth error'});
+      }
+    }
+
+    // Get or create user
+    let foundUser;
+    if (pubKey) {
+      foundUser = await user.getUserByPublicKey(pubKey);
+      if (!foundUser) {
+        foundUser = await user.putUser({ pubKey });
+      }
+    }
+
+    // Create SetupIntent for saving payment method
+    const result = await stripe.createSetupIntent(foundUser, customerId);
+    res.send(result);
+  } catch(err) {
+    console.error('Error creating SetupIntent:', err);
+    res.status(500);
+    res.send({error: err.message || 'Failed to create SetupIntent'});
+  }
+});
+
 app.put('/user/:uuid/processor/:processor', async (req, res) => {
   try {
     const uuid = req.params.uuid;
@@ -464,5 +527,9 @@ console.warn(err);
   }
 });
 
-app.listen(3005);
-console.log('Let\'s add it up');
+if (import.meta.url === `file://${process.argv[1]}`) {
+  app.listen(3005);
+  console.log('Let\'s add it up');
+}
+
+export default app;

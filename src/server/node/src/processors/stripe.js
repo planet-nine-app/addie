@@ -4,7 +4,7 @@ import _stripe from 'stripe';
 const stripeKey = process.env.STRIPE_KEY;
 const stripePublishingKey = process.env.STRIPE_PUBLISHING_KEY;
 
-console.log('stripeKey', stripeKey);
+console.log('stripeKey loaded:', !!stripeKey);
 
 // need to think through this case a bit more
 if(!stripeKey) {
@@ -379,6 +379,37 @@ console.log(promResults);
     } catch(err) {
 console.warn(err);
       return false;
+    }
+  },
+
+  createSetupIntent: async (foundUser, customerId) => {
+    try {
+      // Get or create customer
+      const customer = customerId || foundUser?.stripeCustomerId || (await stripeSDK.customers.create()).id;
+
+      // Save customer ID if we created a new one
+      if (foundUser && foundUser.stripeCustomerId !== customer) {
+        foundUser.stripeCustomerId = customer;
+        await user.saveUser(foundUser);
+      }
+
+      // Create SetupIntent - DO NOT include payment_method_options[card][setup_future_usage]
+      // SetupIntents are already for future use, this parameter is for PaymentIntents only
+      const setupIntent = await stripeSDK.setupIntents.create({
+        customer: customer,
+        automatic_payment_methods: {
+          enabled: true
+        }
+      });
+
+      return {
+        clientSecret: setupIntent.client_secret,
+        publishableKey: stripePublishingKey,
+        customerId: customer
+      };
+    } catch(err) {
+      console.error('Error creating SetupIntent:', err);
+      throw err;
     }
   }
 };
