@@ -164,7 +164,7 @@ After registration is complete:
 ## Files Changed/Created
 
 ```
-allyabase/deployment/addie/
+addie/
 ├── public/                                    # NEW
 │   ├── stripe-registration.html              # NEW - Registration form
 │   └── README.md                              # NEW - Documentation
