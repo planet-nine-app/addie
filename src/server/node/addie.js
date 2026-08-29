@@ -13,8 +13,20 @@ import sessionless from 'sessionless-node';
 import _stripe from 'stripe';
 import stripeConnectedTransfers from './src/processors/stripe-connected-transfers.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// import.meta.url is undefined under esbuild's CJS bundling target (used by
+// Netlify's function bundler), unlike real ESM (e.g. `node addie.js` on the
+// droplet) - fall back to cwd rather than crashing the whole bundled
+// function at module load. The static file serving below just won't find
+// real files in that context - a contained degradation, not a full-service
+// outage, since none of addie's actual API routes depend on it.
+let __filename, __dirname;
+try {
+  __filename = fileURLToPath(import.meta.url);
+  __dirname = dirname(__filename);
+} catch {
+  __filename = process.cwd();
+  __dirname = process.cwd();
+}
 
 const addieStripeURL = process.env.ADDIE_STRIPE_URL;
 const stripe = processors.stripe;
@@ -98,13 +110,7 @@ console.log('auth error');
     }
 
     // Check if user already exists with this pubKey
-    let foundUser;
-    try {
-      foundUser = await user.getUserByPublicKey(pubKey);
-    }
-    catch(err) {
-console.log('no user found. Creating a new one');
-    }
+    let foundUser = await user.getUserByPublicKey(pubKey);
 
     // If user doesn't exist, create new one
     if(!foundUser) {
@@ -140,6 +146,69 @@ app.get('/user/:uuid', async (req, res) => {
   } catch(err) {
     res.status(404);
     res.send({error: 'not found'});
+  }
+});
+
+// Lookup user by UUID for base admin payouts (no auth required)
+app.get('/user/lookup/:uuid', async (req, res) => {
+  try {
+    const uuid = req.params.uuid;
+
+    const foundUser = await user.getUserByUUID(uuid);
+
+    if(!foundUser) {
+      res.status(404);
+      return res.send({error: 'User not found'});
+    }
+
+    // Return minimal information for base admin setup
+    res.send({
+      uuid: foundUser.uuid,
+      pubKey: foundUser.pubKey,
+      stripeCustomerId: foundUser.stripeCustomerId || null,
+      stripePayoutCardId: foundUser.stripePayoutCardId || null,
+      canReceivePayouts: !!foundUser.stripePayoutCardId
+    });
+  } catch(err) {
+    res.status(404);
+    res.send({error: 'not found'});
+  }
+});
+
+// SetupIntent endpoint for saving payment methods (used by The Advancement app)
+app.post('/processor/stripe/setup-intent', async (req, res) => {
+  try {
+    const body = req.body;
+    const timestamp = body.timestamp;
+    const pubKey = body.pubKey;
+    const signature = body.signature;
+    const customerId = body.customerId;
+
+    // Verify signature if provided (optional for SetupIntent creation)
+    if (signature && pubKey) {
+      const message = timestamp + pubKey;
+      if (!sessionless.verifySignature(signature, message, pubKey)) {
+        res.status(403);
+        return res.send({error: 'Auth error'});
+      }
+    }
+
+    // Get or create user
+    let foundUser;
+    if (pubKey) {
+      foundUser = await user.getUserByPublicKey(pubKey);
+      if (!foundUser) {
+        foundUser = await user.putUser({ pubKey });
+      }
+    }
+
+    // Create SetupIntent for saving payment method
+    const result = await stripe.createSetupIntent(foundUser, customerId);
+    res.send(result);
+  } catch(err) {
+    console.error('Error creating SetupIntent:', err);
+    res.status(500);
+    res.send({error: err.message || 'Failed to create SetupIntent'});
   }
 });
 
@@ -1188,5 +1257,9 @@ console.warn(err);
   }
 });
 
-app.listen(3005);
-console.log('Let\'s add it up');
+if (import.meta.url === `file://${process.argv[1]}`) {
+  app.listen(3005);
+  console.log('Let\'s add it up');
+}
+
+export default app;

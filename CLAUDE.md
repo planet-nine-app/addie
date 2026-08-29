@@ -16,6 +16,11 @@ Addie is a Planet Nine allyabase microservice that handles payment processing an
 
 ## API Endpoints
 
+### User Management
+- `PUT /user/create` - Create or get Addie user by public key
+- `GET /user/:uuid` - Get user by UUID (requires authentication)
+- `GET /user/lookup/:uuid` - Lookup user by UUID for base admin (no auth required)
+
 ### Payment Operations
 - `POST /payment` - Process a payment transaction
 - `POST /payment/:paymentIntentId/process-transfers` - Process instant transfers to payout cards after payment
@@ -122,11 +127,67 @@ The MAGIC endpoint (`/magic/spell/:spellName`) allows other services to trigger 
 4. Addie processes payment and signs contract step
 5. Contract progresses through remaining steps
 
+## Base Payout System (January 2025)
+
+The base payout system enables Planet Nine bases to receive payments for hosting services and pay out users for contributing to the base.
+
+### User Flow
+
+1. **User displays service identifiers** in The Advancement app:
+   - Navigate to Payment Setup → Service Info
+   - View Fount UUID, Covenant UUID, Addie UUID, and Public Key
+   - Tap any value to copy to clipboard
+
+2. **User shares UUIDs** with base administrator:
+   - Send UUIDs via secure channel
+   - Administrator can use any of the three service UUIDs (Fount, Covenant, or Addie)
+
+3. **Base administrator looks up user**:
+   - Use `GET /user/lookup/:uuid` endpoint
+   - No authentication required (public lookup)
+   - Returns minimal info: UUID, pubKey, payout card status
+
+4. **Administrator configures payouts**:
+   - Verify user has payout card configured (`canReceivePayouts: true`)
+   - Add user to base payout recipients list
+   - Configure payout percentages or amounts
+
+### Lookup Endpoint
+
+**Endpoint**: `GET /user/lookup/:uuid`
+
+**No authentication required** - This endpoint is intentionally public to allow base administrators to lookup users by their service UUIDs.
+
+**Request**:
+```bash
+curl http://localhost:3005/user/lookup/fount-uuid-here
+# or
+curl http://localhost:3005/user/lookup/addie-uuid-here
+```
+
+**Response**:
+```javascript
+{
+  uuid: "addie-user-uuid",
+  pubKey: "02a1b2c3...",
+  stripeCustomerId: "cus_...",
+  stripePayoutCardId: "pm_...",
+  canReceivePayouts: true
+}
+```
+
+**Security Considerations**:
+- Returns only minimal information needed for payout setup
+- Does not expose sensitive payment details
+- Payout card ID is not sufficient to perform unauthorized transactions
+- Actual payouts still require proper authentication and authorization
+
 ## Security Model
 
 - **Sessionless Authentication**: All operations require cryptographic signatures
 - **No Stored Credentials**: Payment processor credentials managed securely
 - **Transaction Verification**: All payments verified before contract signing
+- **Public Lookup**: User lookup endpoint intentionally public for base admin convenience
 
 ## Future Enhancements
 
@@ -982,4 +1043,6 @@ const transfer = await stripe.transfers.create({
 See `/mutopia/CONNECTED-ACCOUNT-TRANSFERS.md` for complete implementation details, troubleshooting, and testing procedures.
 
 ## Last Updated
+January 2025 - Added base payout system with public user lookup endpoint (`GET /user/lookup/:uuid`) and Service Info UI in The Advancement app for sharing service UUIDs with base administrators.
+
 November 19, 2025 - Added comprehensive Stripe Connected Accounts documentation for platform revenue splits. Documented critical setup requirements (business_type: 'company', tax_id, valid URL), common errors and fixes, and differences from payout cards. Includes complete code examples for account creation, capability troubleshooting, and transfer processing. Ready for production platform integrations.

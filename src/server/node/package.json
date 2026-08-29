@@ -10,6 +10,7 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "dependencies": {
+    "@netlify/blobs": "^10.7.13",
     "@square/web-sdk": "^2.0.1",
     "bdo-js": "latest",
     "body-parser": "^1.20.2",
@@ -17,6 +18,7 @@
     "dayjs": "^1.11.13",
     "express": "^4.19.2",
     "fount-js": "latest",
+    "serverless-http": "^4.0.0",
     "sessionless-node": "latest",
     "stripe": "^16.8.0",
     "ws": "^8.18.0"

@@ -5,6 +5,8 @@ import _stripe from 'stripe';
 const stripeKey = process.env.STRIPE_KEY;
 const stripePublishingKey = process.env.STRIPE_PUBLISHING_KEY;
 
+console.log('stripeKey loaded:', !!stripeKey);
+
 // need to think through this case a bit more
 if(!stripeKey) {
   const processors = {
@@ -1076,7 +1078,8 @@ console.error('Error fetching transactions:', err);
         error: err.message
       };
     }
-  }
+  },
+
 };
 
 export default stripe;

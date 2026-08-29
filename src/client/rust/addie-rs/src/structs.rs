@@ -24,6 +24,29 @@ impl Default for AddieUser {
     }
 }
 
+/// Response from the Express-account onboarding endpoint
+/// (`/user/:uuid/processor/stripe/express`) — distinct from `AddieUser`
+/// because this flow actually returns a hosted onboarding URL to redirect
+/// the user to, which the plain/company `/processor/stripe` endpoint never
+/// does. `stripe_onboarding_url` is absent when the server found an
+/// already-connected account for this email (`already_connected: true`) and
+/// skipped creating a fresh Account Link.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct AddieExpressAccount {
+    #[serde(default)]
+    pub pub_key: String,
+    pub uuid: String,
+    #[serde(rename = "stripeAccountId")]
+    #[serde(default)]
+    pub stripe_account_id: String,
+    #[serde(rename = "stripeOnboardingUrl")]
+    #[serde(default)]
+    pub stripe_onboarding_url: Option<String>,
+    #[serde(default)]
+    pub already_connected: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct Gateway {
@@ -112,4 +135,66 @@ impl PaymentIntent {
 pub struct Payee {
     pub pubKey: String,
     pub amount: i32
+}
+
+/// The recipient of the 91% split — Addie's buildPayeeMetadata caps this at
+/// min(91% of gross, amount-after-Stripe-fee); only a pubKey is needed here,
+/// the amount is computed server-side.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct Merchant {
+    pub pubKey: String
+}
+
+/// Response from `GET /saved-payment-methods` — each entry in
+/// `payment_methods` is a raw Stripe PaymentMethod object (card
+/// brand/last4/exp live at `.card.brand`/`.card.last4`/etc, plus a top-level
+/// `.id` to pass back into `charge_with_saved_method`); left as `Value`
+/// rather than a typed struct since addie-rs doesn't otherwise model
+/// Stripe's own object shapes anywhere. Empty (not an error) when the buyer
+/// has never saved a card yet.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct SavedPaymentMethods {
+    #[serde(default)]
+    pub payment_methods: Vec<Value>,
+    #[serde(default)]
+    pub customer_id: Option<String>,
+}
+
+/// Response from `POST /charge-with-saved-method`. On success,
+/// `payment_intent` is the full Stripe PaymentIntent object. If Stripe
+/// requires fresh 3DS authentication before this specific off-session
+/// charge can complete (rare for an already-saved card, but possible),
+/// `success` is `false`, `requires_authentication` is `true`, and
+/// `payment_intent` is just `{id, client_secret}` — matches the server
+/// route exactly (confirmed by reading addie.js/stripe.js).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ChargeResult {
+    pub success: bool,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub requires_authentication: bool,
+    #[serde(default)]
+    pub payment_intent: Option<Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct TransferResult {
+    pub success: bool,
+    #[serde(default)]
+    pub transfers: Vec<Value>,
+    #[serde(default)]
+    pub payment_intent_id: Option<String>,
+    #[serde(default)]
+    pub total_transfers: Option<u32>,
+    #[serde(default)]
+    pub failed_transfers: Option<u32>,
+    #[serde(default)]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>
 }
