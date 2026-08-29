@@ -70,11 +70,11 @@ console.log('throwing');
   },
 
   saveExpressAccountByEmail: async (email, accountId) => {
-    await client.set(`stripeExpressEmail:${email}`, accountId);
+    await (await client).set(`stripeExpressEmail:${email}`, accountId);
   },
 
   getExpressAccountByEmail: async (email) => {
-    return await client.get(`stripeExpressEmail:${email}`);
+    return await (await client).get(`stripeExpressEmail:${email}`);
   }
 
 };

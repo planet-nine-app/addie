@@ -110,7 +110,7 @@ console.log('response from addie', user);
     return user;
   },
 
-  getPaymentIntent: async (uuid, processor, amount, currency, payees) => {
+  getPaymentIntent: async (uuid, processor, amount, currency, payees, merchant) => {
     const timestamp = new Date().getTime() + '';
     const message = timestamp + uuid + amount + currency;
     const signature = await sessionless.sign(message);
@@ -120,6 +120,7 @@ console.log('response from addie', user);
 	amount,
 	currency,
 	"payees": payees,
+	"merchant": merchant,
 	"signature": signature
     };
 
@@ -128,6 +129,18 @@ console.log('response from addie', user);
     const intent = await res.json();
 
     return intent;
+  },
+
+  // Re-verifies the PaymentIntent actually succeeded directly with Stripe,
+  // then transfers each payee/merchant's cut — safe to call any time after
+  // the fact, since it never trusts a client-asserted "payment succeeded"
+  // claim. No signature required; matches the real, unauthenticated route.
+  processConnectedTransfers: async (paymentIntentId) => {
+    const url = `${addie.baseURL}payment/${paymentIntentId}/process-connected-transfers`;
+    const res = await post(url, {});
+    const result = await res.json();
+
+    return result;
   },
 
   getPaymentIntentWithoutSplits: async (uuid, processor, amount, currency, savePaymentMethod = false) => {

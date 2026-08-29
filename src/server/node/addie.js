@@ -13,8 +13,20 @@ import sessionless from 'sessionless-node';
 import _stripe from 'stripe';
 import stripeConnectedTransfers from './src/processors/stripe-connected-transfers.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// import.meta.url is undefined under esbuild's CJS bundling target (used by
+// Netlify's function bundler), unlike real ESM (e.g. `node addie.js` on the
+// droplet) - fall back to cwd rather than crashing the whole bundled
+// function at module load. The static file serving below just won't find
+// real files in that context - a contained degradation, not a full-service
+// outage, since none of addie's actual API routes depend on it.
+let __filename, __dirname;
+try {
+  __filename = fileURLToPath(import.meta.url);
+  __dirname = dirname(__filename);
+} catch {
+  __filename = process.cwd();
+  __dirname = process.cwd();
+}
 
 const addieStripeURL = process.env.ADDIE_STRIPE_URL;
 const stripe = processors.stripe;
